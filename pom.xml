@@ -10,8 +10,8 @@
 	<groupId>br.com.itau</groupId>
 	<artifactId>geradornotafiscal</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>calculadoratributos</name>
-	<description>Aplicacao para calculo de tributos</description>
+	<name>invoicegenerator</name>
+	<description>Invoice generation service</description>
 	<properties>
 		<java.version>11</java.version>
 	</properties>
