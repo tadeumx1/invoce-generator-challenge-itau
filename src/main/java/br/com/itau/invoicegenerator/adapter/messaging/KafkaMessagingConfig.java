@@ -1,5 +1,13 @@
 package br.com.itau.invoicegenerator.adapter.messaging;
 
+import br.com.itau.invoicegenerator.adapter.integration.delivery.DeliverySchedulingConsumer;
+import br.com.itau.invoicegenerator.adapter.integration.finance.AccountsReceivableConsumer;
+import br.com.itau.invoicegenerator.adapter.integration.registration.InvoiceRegistrationConsumer;
+import br.com.itau.invoicegenerator.adapter.integration.stock.StockDeductionConsumer;
+import br.com.itau.invoicegenerator.domain.port.AccountsReceivablePort;
+import br.com.itau.invoicegenerator.domain.port.DeliveryPort;
+import br.com.itau.invoicegenerator.domain.port.InvoiceRegistrationPort;
+import br.com.itau.invoicegenerator.domain.port.StockPort;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -50,5 +58,27 @@ public class KafkaMessagingConfig {
   @Bean
   public NewTopic accountsReceivableTopic() {
     return KafkaTopicsConfig.accountsReceivableTopic();
+  }
+
+  @Bean
+  public StockDeductionConsumer stockDeductionConsumer(StockPort stockPort) {
+    return new StockDeductionConsumer(stockPort);
+  }
+
+  @Bean
+  public InvoiceRegistrationConsumer invoiceRegistrationConsumer(
+      InvoiceRegistrationPort registrationPort) {
+    return new InvoiceRegistrationConsumer(registrationPort);
+  }
+
+  @Bean
+  public DeliverySchedulingConsumer deliverySchedulingConsumer(DeliveryPort deliveryPort) {
+    return new DeliverySchedulingConsumer(deliveryPort);
+  }
+
+  @Bean
+  public AccountsReceivableConsumer accountsReceivableConsumer(
+      AccountsReceivablePort accountsReceivablePort) {
+    return new AccountsReceivableConsumer(accountsReceivablePort);
   }
 }
