@@ -254,7 +254,40 @@ Response JSON: `{ "codigo": "...", "mensagem": "..." }`.
 
 ## How the solution was built
 
-The evolution is planned as a chain of **traceable features** under `.specs/`. Each
+The project follows **Spec-Driven Development (SDD)**: every non-trivial change starts
+as a written specification before any code is touched. Each feature lives under
+`.specs/features/<name>/` and goes through four adaptive phases:
+
+```
+┌──────────┐   ┌──────────┐   ┌─────────┐   ┌─────────┐
+│ SPECIFY  │ → │  DESIGN  │ → │  TASKS  │ → │ EXECUTE │
+└──────────┘   └──────────┘   └─────────┘   └─────────┘
+   required      optional*      optional*     required
+
+* skipped automatically when the scope does not need them
+```
+
+- **`spec.md`** — problem statement, user stories with WHEN/THEN acceptance criteria,
+  and stable requirement IDs (`SAFETY-NN`, `DEF-PERF-NN`, `OBS-NN`, …) that thread
+  through design, tasks, and tests.
+- **`design.md`** — only when there are real architectural decisions to lock down
+  (dependency matrices, component breakdown, data models, mermaid diagrams).
+- **`tasks.md`** — atomic execution steps with explicit `Done when` checklists,
+  required test types, and gate commands; each task is one focused commit.
+- **`STATE.md`** — captures architectural decisions (ADRs), resolved blockers, and
+  lessons learned across the whole roadmap, so the *why* survives across sessions.
+
+Why SDD here:
+
+- The challenge brief carries ten themes; specs let each one trace cleanly to the
+  feature that resolves it (the table in [`README-CHALLENGE.md`](README-CHALLENGE.md)
+  is generated from this).
+- Defects are catalogued separately (`.specs/codebase/CONCERNS.md`, C-1..C-10) and each
+  spec states which concerns it closes — so the diff and the documentation always agree.
+- Tasks are small enough to map 1-to-1 to commits, so `git log --oneline` reads like a
+  changelog instead of a wall of refactor noise.
+
+The evolution itself is a chain of **traceable features** under `.specs/`. Each
 feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
 (architecture), and a `tasks.md` (atomic execution steps with test gates). Full roadmap:
 [`.specs/project/ROADMAP.md`](.specs/project/ROADMAP.md).
