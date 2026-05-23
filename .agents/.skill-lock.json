@@ -12,7 +12,7 @@
         "claude-code",
         "github-copilot"
       ],
-      "method": "copy",
+      "method": "symlink",
       "global": false
     }
   }

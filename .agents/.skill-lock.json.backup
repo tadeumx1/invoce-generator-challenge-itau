@@ -11,7 +11,7 @@
         "cursor",
         "claude-code"
       ],
-      "method": "copy",
+      "method": "symlink",
       "global": false
     }
   }
