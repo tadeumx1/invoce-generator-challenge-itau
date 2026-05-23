@@ -61,24 +61,31 @@ public class KafkaMessagingConfig {
   }
 
   @Bean
-  public StockDeductionConsumer stockDeductionConsumer(StockPort stockPort) {
-    return new StockDeductionConsumer(stockPort);
+  public IdempotencyStore idempotencyStore() {
+    return new IdempotencyStore();
+  }
+
+  @Bean
+  public StockDeductionConsumer stockDeductionConsumer(
+      StockPort stockPort, IdempotencyStore idempotencyStore) {
+    return new StockDeductionConsumer(stockPort, idempotencyStore);
   }
 
   @Bean
   public InvoiceRegistrationConsumer invoiceRegistrationConsumer(
-      InvoiceRegistrationPort registrationPort) {
-    return new InvoiceRegistrationConsumer(registrationPort);
+      InvoiceRegistrationPort registrationPort, IdempotencyStore idempotencyStore) {
+    return new InvoiceRegistrationConsumer(registrationPort, idempotencyStore);
   }
 
   @Bean
-  public DeliverySchedulingConsumer deliverySchedulingConsumer(DeliveryPort deliveryPort) {
-    return new DeliverySchedulingConsumer(deliveryPort);
+  public DeliverySchedulingConsumer deliverySchedulingConsumer(
+      DeliveryPort deliveryPort, IdempotencyStore idempotencyStore) {
+    return new DeliverySchedulingConsumer(deliveryPort, idempotencyStore);
   }
 
   @Bean
   public AccountsReceivableConsumer accountsReceivableConsumer(
-      AccountsReceivablePort accountsReceivablePort) {
-    return new AccountsReceivableConsumer(accountsReceivablePort);
+      AccountsReceivablePort accountsReceivablePort, IdempotencyStore idempotencyStore) {
+    return new AccountsReceivableConsumer(accountsReceivablePort, idempotencyStore);
   }
 }

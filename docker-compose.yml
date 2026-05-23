@@ -1,0 +1,66 @@
+# F-DEFECTS-PERFORMANCE T4 — local Kafka stack for invoice-generator.
+# Run with: docker compose up --build
+#
+# Components:
+#   - kafka                : Confluent Kafka in KRaft mode (no Zookeeper).
+#                             Internal listener kafka:9092 for app containers.
+#                             External listener localhost:29092 for host tools.
+#   - invoice-generator    : Spring Boot app built from local Dockerfile.
+#                             HTTP on host port 8080. Management on host port 8081.
+#                             Topics (main + retry + DLT) are auto-created on startup
+#                             by KafkaAdmin (NewTopic beans + @RetryableTopic).
+
+services:
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: invoice-kafka
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: '1'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093,EXTERNAL://0.0.0.0:29092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: '1'
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: '0'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      # Base64-URL-encoded 16-byte UUID. Stable so volumes can be reused.
+      CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
+    ports:
+      - "29092:29092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server kafka:9092 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+
+  invoice-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: invoice-generator:local
+    container_name: invoice-generator
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: 'kafka:9092'
+      JAVA_OPTS: '-XX:MaxRAMPercentage=75 -Xss512k'
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/orders/generate-invoice >/dev/null 2>&1 || curl -sf http://localhost:8080/ || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+# No volumes intentionally — F-DEFECTS-PERFORMANCE keeps state ephemeral for
+# the technical-test demo. Production would persist Kafka log dirs and a real
+# durable idempotency store (see IdempotencyStore javadoc).

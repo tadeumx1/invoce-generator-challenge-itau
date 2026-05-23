@@ -77,10 +77,15 @@ F-DEFECTS-FUNCTIONAL resolved the first correctness batch:
 - JURIDICA + `taxRegime = OUTROS`/null rejects with HTTP 400 (C-2 fixed).
 - Missing delivery address or delivery address with `region=null` rejects with HTTP 400 (C-3 fixed).
 - Money uses `BigDecimal`; calculated tax/freight round to scale 2 with `HALF_EVEN` (C-4 fixed).
-- There is no fire-and-forget implementation today. The use case calls stock, registration, delivery, and finance ports synchronously. F-DEFECTS-PERFORMANCE must replace those direct calls with Kafka producer/consumer dispatch plus retry/DLQ/idempotency, not detached threads or untracked `CompletableFuture.runAsync`.
-- For the technical test, Kafka consumers may live in this same Spring Boot codebase so Docker Compose demonstrates the full flow. In production, invoice-generator should publish events only; stock, fiscal registration, delivery, and accounts-receivable services should own their own consumers.
-- After F-DEFECTS-PERFORMANCE, HTTP success for `POST /api/orders/generate-invoice` should mean the invoice was generated and Kafka dispatch was accepted. It must not imply downstream side effects have already completed.
-- Delivery still adds 5 seconds when invoice item count is greater than 5 (C-6 still open; next feature is F-DEFECTS-PERFORMANCE).
+
+F-DEFECTS-PERFORMANCE closed C-6 with Kafka async dispatch:
+
+- `GenerateInvoiceInteractor` depends on `InvoiceSideEffectDispatcher` (domain port). The Kafka adapter publishes four `IntegrationEvent` JSON envelopes (one per topic: `invoice.stock-deduction.v1`, `invoice.registration.v1`, `invoice.delivery-scheduling.v1`, `invoice.accounts-receivable.v1`) and returns; HTTP success means *generated + dispatch accepted*, not "downstreams completed".
+- Four `@KafkaListener` consumers (one per integration, separate group IDs) call the existing port adapters. The 5-second delivery sleep stays in the consumer.
+- `@RetryableTopic` (attempts=4, exponential backoff with `app.kafka.retry.*` properties) wires retry topics + a `-dlt` topic per integration. Auto-created on startup.
+- In-memory `IdempotencyStore` keyed on `(topic, eventId)` dedupes Kafka redelivery. **Not durable** — production needs Redis/Postgres (see `AD-024`).
+- Local stack: `docker compose up --build` starts `cp-kafka` (KRaft) + the app; HTTP on 8080, Kafka external listener on host 29092.
+- Tests: `InvoiceKafkaFlowIntegrationTest` uses `@EmbeddedKafka` for end-to-end proof. `InvoiceControllerIntegrationTest` and `InvoiceGeneratorApplicationTests` set `app.messaging.kafka.enabled=false` plus `NoOpKafkaTestConfig` to skip Kafka context wiring.
 
 ## Testing Notes
 
@@ -91,3 +96,26 @@ The main safety net is 56 fast tests plus the slow profile on demand:
 - `./mvnw verify`: full pre-commit gate.
 
 No current tests use Mockito; it is excluded from the test starter to keep Spring tests runnable in restricted JVM environments.
+
+## Observability (F-OBSERVABILITY, planned)
+
+The spec at `.specs/features/observability/spec.md` freezes four SLIs that every Micrometer
+counter, timer, and histogram in this codebase exists to serve:
+
+1. **SLI-1 API success rate** — `http.server.requests` (status ≠ 5xx). SLO: 99.5 % / 30d.
+2. **SLI-2 API latency** — `http.server.requests` histogram, SLO buckets at 300 ms / 800 ms / 2 s. SLO: 99 % < 800 ms.
+3. **SLI-3 Kafka dispatch success** — `invoice.dispatch{outcome}` counter. SLO: 99.9 % / 7d.
+4. **SLI-4 Side-effect end-to-end latency** — `invoice.sideeffect.duration` timer (producer → consumer-ack). SLO: 95 % < 30s per integration.
+
+Rules for any future metric / log / trace work:
+
+- **SLIs live in the backend, not in code.** The application emits raw counters / timers /
+  histogram buckets only. Prometheus or CloudWatch computes the ratio.
+- **`orderId`, `invoiceId`, `correlationId`, `traceId`, and `spanId` are never metric tags.**
+  They go on logs (via MDC) and on trace attributes only — see AD-020 in `STATE.md` and the
+  cardinality table in the spec.
+- **JSON logs only.** Use the configured `logstash-logback-encoder` setup; no
+  `System.out.println`, no plain-text logger calls.
+- **Local vs AWS.** Local Docker Compose uses Prometheus scrape + OTLP → Jaeger; AWS uses
+  the Micrometer CloudWatch registry + ADOT collector → X-Ray (AD-018). Spring profile
+  picks the registry/exporter; instrumentation code is the same.

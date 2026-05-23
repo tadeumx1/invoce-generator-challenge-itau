@@ -1,0 +1,14 @@
+.git
+.idea
+.cursor
+.claude
+.agents
+.settings
+.classpath
+.project
+target/
+HELP.md
+docs/
+.specs/
+*.log
+.DS_Store

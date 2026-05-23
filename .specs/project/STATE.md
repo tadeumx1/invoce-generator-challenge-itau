@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-23
-**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, and F-DEFECTS-FUNCTIONAL complete. Next: F-DEFECTS-PERFORMANCE.
+**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, and F-DEFECTS-PERFORMANCE complete. F-OBSERVABILITY spec + design + tasks frozen (32 reqs, 4 SLIs, 5 vertical-slice tasks). Next up: execute F-OBSERVABILITY → F-RESILIENCE → F-AWS.
 
 ---
 
@@ -112,6 +112,69 @@
 **Trade-off:** Values like `72 × 1.048` now return `75.46` instead of `75.456`. The API still serializes numbers, but calculated values are now BRL-scale.
 **Impact:** C-4 is resolved. Tests compare `BigDecimal` values semantically.
 
+### AD-017: SLI catalog frozen — four service-level indicators (2026-05-23)
+
+**Decision:** F-OBSERVABILITY commits to exactly four SLIs: SLI-1 API success rate, SLI-2 API latency (99 % < 800 ms via histogram bucket fraction), SLI-3 Kafka dispatch success, SLI-4 side-effect end-to-end latency (95 % < 30s producer→consumer-ack).
+**Reason:** Without a frozen list, metric proliferation becomes inevitable. Picking up-front which ratios matter forces every counter/timer to justify its existence by feeding an SLI or by debugging one.
+**Trade-off:** Some operationally interesting signals (e.g., per-bracket calculator latency) are intentionally not promoted to SLIs. They remain queryable metrics but do not get dashboards/alarms.
+**Impact:** The spec at `.specs/features/observability/spec.md` is structured around these four; F-AWS dashboards and alarms must reuse the same definitions verbatim.
+
+### AD-018: Local Prometheus+Jaeger / AWS CloudWatch+X-Ray observability split (2026-05-23)
+
+**Decision:** Micrometer is the single instrumentation abstraction. Local Docker Compose uses the Prometheus registry exposed at `/actuator/prometheus` (scraped by a Prometheus container) and OpenTelemetry OTLP → Jaeger for traces. AWS uses the Micrometer CloudWatch registry (or ADOT collector → CloudWatch metrics) and ADOT → X-Ray for traces. Profile boundary (`application-local.yml` vs `application-aws.yml`) controls the registry/exporter dependency.
+**Reason:** Mirrors the deployment-boundary split already chosen for F-DEFECTS-PERFORMANCE (AD-015). Demonstrating a real observability stack locally with Docker Compose is the whole point of the technical-test version; CloudWatch is the natural AWS production target.
+**Trade-off:** Two profile configurations to maintain, and the local Prometheus stack adds containers. The application code is unchanged between profiles.
+**Impact:** F-OBSERVABILITY ships Prometheus + Jaeger as part of the local compose stack. F-AWS adds the CloudWatch registry/dashboards/alarms.
+
+### AD-019: `logstash-logback-encoder` for structured JSON logs (2026-05-23)
+
+**Decision:** Use `net.logstash.logback:logstash-logback-encoder` as the Logback JSON encoder. Logs go to stdout as single-line JSON. MDC carries `correlationId`, `traceId`, `spanId`, `invoiceId`, `orderId`.
+**Reason:** De facto standard JSON encoder for Logback; predictable schema, well-tested integration with Logback appenders, no Spring-Boot-specific lock-in. Stdout JSON is consumable by both the local Docker log driver and CloudWatch FireLens in production.
+**Trade-off:** Adds a dependency; encoder configuration lives in `logback-spring.xml`. Multi-line stack traces are serialized into a single JSON field, which is the desired behavior for log aggregation.
+**Impact:** OBS-01..OBS-07 implementation depends on this dependency and the corresponding `logback-spring.xml`.
+
+### AD-020: Cardinality budget — `orderId` / `invoiceId` / `correlationId` are never metric tags (2026-05-23)
+
+**Decision:** Free-text or high-cardinality identifiers (order/invoice/correlation/trace/span IDs, customer identifiers) are restricted to **logs and trace attributes only**, never used as Micrometer metric tags. The F-OBSERVABILITY spec carries a per-tag cardinality table that bounds every approved tag.
+**Reason:** Unbounded label cardinality is the standard way to make Prometheus and CloudWatch unhealthy. Every metric tag must have a finite, enumerable set of values.
+**Trade-off:** Some debugging questions ("how slow was order X?") cannot be answered from metrics alone — they require a trace or log lookup. This is the correct design.
+**Impact:** Reviewable in PRs; an automated guard (unit test that introspects registered meters' tag values, or a Checkstyle rule on `Meter.Builder.tags(...)` calls) is part of F-OBSERVABILITY's tasks.
+
+### AD-021: Micrometer Tracing + OTel bridge for Spring Boot 3.5 (2026-05-23)
+
+**Decision:** F-OBSERVABILITY uses `io.micrometer:micrometer-tracing-bridge-otel` + `io.opentelemetry:opentelemetry-exporter-otlp` for tracing. The new `spring-boot-starter-opentelemetry` is **not** adopted because it only exists in Spring Boot 4.0+ (announced on the Spring blog on 2025-11-18) and the project is on Spring Boot 3.5.14 (AD-007). Property prefix is `management.otlp.tracing.*`.
+**Reason:** Pinning the correct artifact set up-front prevents the spec from drifting into a 4.x-only configuration that wouldn't compile on the current parent.
+**Trade-off:** When the project later upgrades to Boot 4.x, this dependency block becomes one line of starter-replacement work. Acceptable.
+**Impact:** F-OBSERVABILITY design.md dependency matrix is locked. F-AWS reuses the OTLP exporter against an ADOT sidecar.
+
+### AD-022: `logstash-logback-encoder:8.0` (Logback 1.5 line) (2026-05-23)
+
+**Decision:** Pin `net.logstash.logback:logstash-logback-encoder:8.0` explicitly (not in the Spring Boot BOM). Logback 1.5 is what Spring Boot 3.5 ships, and the 8.x line is the one compatible with Logback 1.5.
+**Reason:** The encoder is the seam for JSON logs + MDC enrichment used by every other observability piece (OBS-01..OBS-07). Mismatched Logback / encoder versions cause `NoSuchMethodError` at startup.
+**Trade-off:** One more explicit `<version>` to maintain in `pom.xml`. The alternative — letting Maven choose the latest 8.x — is fine but explicit is reviewable.
+**Impact:** `pom.xml` gets a direct dependency entry under F-OBSERVABILITY execution.
+
+### AD-023: Spring Kafka `@RetryableTopic` for retry/DLT topology (2026-05-23)
+
+**Decision:** Use Spring Kafka's `@RetryableTopic` annotation on each consumer method for retry and dead-letter routing, with `attempts=4` and exponential backoff (`delay=60000ms`, `multiplier=5.0`) → effective delays 1m → 5m → 25m → DLT. Backoff is property-driven (`app.kafka.retry.delay-ms`, `app.kafka.retry.multiplier`) so tests can override to sub-second values.
+**Reason:** Spring Kafka 3.x provides the routing, topic auto-creation, and partition wiring out of the box. Writing a custom retry/DLT manager would re-derive what the framework already does. The 25m third retry is one bucket short of the spec's 30m target but stays inside the same operational tier.
+**Trade-off:** Retry topic names follow Spring Kafka's convention (`-retry-{N}`, `-dlt`) rather than the spec's conceptual `.retry.1m/.5m/.30m` suffixes. The semantics are equivalent; renaming via `topicSuffixingStrategy` and `RetryTopicSuffixes` is straightforward if a stakeholder wants exact spec topic names.
+**Impact:** `IdempotencyStore` protects against the at-least-once redelivery this introduces. F-RESILIENCE may add per-adapter circuit breakers on top, but the retry path itself is owned here.
+
+### AD-024: In-memory `IdempotencyStore` keyed on `(topic, eventId)` (2026-05-23)
+
+**Decision:** Consumers dedupe Kafka events via a process-local `ConcurrentHashMap` of `(topic, eventId)` pairs maintained by `IdempotencyStore`. Mark-after-success: the entry is recorded only after the downstream port returns, so a transient failure followed by retry is still re-attempted.
+**Reason:** Acceptable for the technical-test demo. A real production deployment must replace this with a durable store (Redis, Postgres) because a process restart wipes the dedupe set. The class javadoc and `INTEGRATIONS.md` both flag the non-durability.
+**Trade-off:** Restart-on-redelivery duplicates a side effect. Cluster scale-out duplicates across nodes. Both are acceptable in the demo because the downstream stubs are no-op `Thread.sleep`.
+**Impact:** Tracked as a deferred idea: "Swap IdempotencyStore for a durable backend before any production rollout." F-AWS Terraform should reserve a Redis/ElastiCache footprint if the production path is built.
+
+### AD-025: Kafka beans gated by explicit `app.messaging.kafka.enabled` property (2026-05-23)
+
+**Decision:** `KafkaMessagingConfig` is `@ConditionalOnProperty(name="app.messaging.kafka.enabled", havingValue="true")`. The property defaults to `true` in `application.properties`; tests that want to skip the Kafka beans set it to `false` and provide a `@Primary` no-op `InvoiceSideEffectDispatcher` (see `NoOpKafkaTestConfig`).
+**Reason:** `@ConditionalOnBean(KafkaTemplate.class)` proved unreliable on user `@Configuration` classes — the condition is evaluated before `KafkaAutoConfiguration` contributes the template bean, so the condition spuriously returns false even when Kafka is enabled. An explicit property avoids the auto-config-ordering trap.
+**Trade-off:** One more piece of configuration to remember when writing a Spring-context test. Mitigated by the shared `NoOpKafkaTestConfig` plus the same `app.messaging.kafka.enabled=false` line on `@TestPropertySource`.
+**Impact:** Future Kafka-related code should be added under `KafkaMessagingConfig` so it inherits the same gate. F-OBSERVABILITY's Kafka-side bindings will use the same condition.
+
 ### AD-005: Terraform as default IaC for the AWS deployment (2026-05-22)
 
 **Decision:** Use Terraform (not CDK) for the IaC artifact under F-AWS.
@@ -179,6 +242,14 @@ None.
 | 012 | F-CLEAN — Clean Architecture layers, ports/adapters, DTO mapping, docs/spec updates                 | 2026-05-23 | (HEAD) | ✅ Done |
 | 013 | F-CLEAN follow-up — switch-based freight calculation, null-safe region lookup, async guidance       | 2026-05-23 | (HEAD) | ✅ Done |
 | 014 | F-DEFECTS-FUNCTIONAL — resolve C-1 through C-4 with stateless tax, 400 validation, BigDecimal money | 2026-05-23 | (HEAD) | ✅ Done |
+| 015 | F-OBSERVABILITY spec frozen — SLI catalog, log/metric/trace scope, cardinality budget, AD-017..AD-020 | 2026-05-23 | (HEAD) | ✅ Done |
+| 016 | F-OBSERVABILITY design frozen — dependency matrix, components, profile configs, AD-021..AD-022 | 2026-05-23 | (HEAD) | ✅ Done |
+| 017 | F-OBSERVABILITY tasks.md frozen — 5 consolidated vertical-slice tasks (per task-granularity feedback) | 2026-05-23 | (HEAD) | ✅ Done |
+| 018 | F-DEFECTS-PERFORMANCE T1 — Kafka producer + IntegrationEvent contract + InvoiceSideEffectDispatcher port | 2026-05-23 | (HEAD) | ✅ Done |
+| 019 | F-DEFECTS-PERFORMANCE T2 — 4 @KafkaListener consumers + EmbeddedKafka end-to-end integration test | 2026-05-23 | (HEAD) | ✅ Done |
+| 020 | F-DEFECTS-PERFORMANCE T3 — @RetryableTopic with 4-attempt backoff + DLT + in-memory IdempotencyStore | 2026-05-23 | (HEAD) | ✅ Done |
+| 021 | F-DEFECTS-PERFORMANCE T4 — multi-stage Dockerfile + docker-compose with cp-kafka 7.7 KRaft | 2026-05-23 | (HEAD) | ✅ Done |
+| 022 | F-DEFECTS-PERFORMANCE T5 — docs cross-link, ROADMAP/STATE/CONCERNS update, final verify | 2026-05-23 | (HEAD) | ✅ Done |
 
 > Commits are pending — none of the above is in git yet beyond the initial commit `0780ce3`. To be staged when the user asks.
 
@@ -205,6 +276,7 @@ In-progress thoughts and action items that don't fit in active tasks.
 - [ ] Decide F-AWS compute target (ECS Fargate vs Lambda) before writing Terraform modules. Default lean: ECS Fargate (predictable behavior, no cold starts, fits the synchronous critical path of `RegistrationService`).
 - [ ] Add `.gitignore` entries for `.specs/` if the user wants the spec-driven artifacts kept local (currently included; recommend keeping them committed for review).
 - [ ] During F-DEFECTS-PERFORMANCE, implement Kafka async dispatch for `stockPort`, `invoiceRegistrationPort`, `deliveryPort`, and `accountsReceivablePort` and add retry/DLQ/idempotency coverage.
+- [ ] After F-OBSERVABILITY tasks land, create `docs/observability.md` (SLI catalog + Prometheus queries + runbook) and link it from `CLAUDE.md` / `README.md`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Spec:** `.specs/features/defects-performance/spec.md`
 **Design:** inline for now; implementation design can be expanded if Kafka wiring introduces more than the task list below.
-**Status:** Planned
+**Status:** Done (2026-05-23). Executed as 5 consolidated vertical-slice tasks per the [[feedback-task-granularity]] preference. The original 8-task breakdown below is preserved for traceability — every requirement DEF-PERF-01..23 is satisfied. See `STATE.md` quick tasks #018-#022 for the actual execution log and `AD-023..AD-025` for the design decisions made during implementation.
 
 ---
 

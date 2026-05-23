@@ -55,12 +55,16 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 
 ---
 
-## C-6 — Side-effects run synchronously on the request thread 🟠 medium
+## C-6 — Side-effects run synchronously on the request thread ✅ resolved in F-DEFECTS-PERFORMANCE
 
-**Evidence:** `application/GenerateInvoiceInteractor.java` calls four outbound ports synchronously; adapters in `adapter/integration/**` still `Thread.sleep`.
-**Latency budget:** 380 + 500 + 150 + 200 + 250 = **1480 ms** for any order; **+5000 ms** more when `items.size() > 5`.
-**Impact:** Tail latency is unbounded by upstream slowness. The request thread is held throughout. No timeouts; no circuit breakers; no retries; no observability into which leg was slow.
-**Fix:** Move all four side effects (stock, invoice registration, delivery, accounts receivable) to Kafka async dispatch. Publish durable integration events after invoice generation; consumers call the downstream adapters with retry/backoff, DLQ handling, and idempotency. Track under **F-DEFECTS-PERFORMANCE** for removing the +5s request-path trap and **F-RESILIENCE** for full runtime hardening.
+**Previous evidence:** `application/GenerateInvoiceInteractor.java` invoked four outbound ports synchronously; adapters in `adapter/integration/**` still `Thread.sleep`.
+**Previous latency budget:** 380 + 500 + 150 + 200 + 250 = **1480 ms** for any order; **+5000 ms** more when `items.size() > 5`.
+**Resolution:** `GenerateInvoiceInteractor` now depends on a single `InvoiceSideEffectDispatcher` port. The Kafka-backed implementation publishes four integration events (one per topic) and returns. Four `@KafkaListener` consumers in `adapter/integration/{stock,registration,delivery,finance}` call the existing port adapters. The 5-second delivery sleep stays on the consumer thread.
+**Regression coverage:** `InvoiceKafkaFlowIntegrationTest` uses EmbeddedKafka end-to-end and asserts the HTTP path returns under 3 s, plus all four consumers process the events.
+**Retry / DLT:** Spring Kafka's `@RetryableTopic` on each consumer (4 attempts, exponential backoff) routes transient failures to retry topics and exhausted failures to a `-dlt` topic. AD-023 documents the timing.
+**Idempotency:** in-memory `IdempotencyStore` keyed on `(topic, eventId)` deduplicates Kafka redelivery. Non-durable; AD-024 records the production-rollout caveat.
+**Observability hook:** the "no observability into which leg was slow" half of this concern is wired by **F-OBSERVABILITY** (SLI-4 side-effect end-to-end timer producer→consumer-ack; per-topic dispatch/retry/DLT counters; consumer-lag gauge; HTTP→Kafka trace propagation).
+**Residual risk:** `IdempotencyStore` is in-memory. A process restart drops the dedupe set and could allow Kafka redelivery to double-execute a side effect. Tracked as a deferred idea.
 
 ---
 
