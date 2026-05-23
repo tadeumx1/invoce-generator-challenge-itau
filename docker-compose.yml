@@ -5,10 +5,13 @@
 #   - kafka                : Confluent Kafka in KRaft mode (no Zookeeper).
 #                             Internal listener kafka:9092 for app containers.
 #                             External listener localhost:29092 for host tools.
+#   - jaeger               : OTLP trace receiver + Jaeger UI (F-OBSERVABILITY T4).
+#                             OTLP HTTP on 4318 (consumed by the app), UI on 16686.
 #   - invoice-generator    : Spring Boot app built from local Dockerfile.
 #                             HTTP on host port 8080. Management on host port 8081.
 #                             Topics (main + retry + DLT) are auto-created on startup
 #                             by KafkaAdmin (NewTopic beans + @RetryableTopic).
+#                             Traces flow OTLP → Jaeger; explore at http://localhost:16686.
 
 services:
 
@@ -41,6 +44,15 @@ services:
       timeout: 10s
       retries: 12
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: invoice-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP receiver (matches OTLP_TRACING_ENDPOINT default)
+
   invoice-generator:
     build:
       context: .
@@ -50,8 +62,11 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     environment:
       KAFKA_BOOTSTRAP_SERVERS: 'kafka:9092'
+      OTLP_TRACING_ENDPOINT: 'http://jaeger:4318/v1/traces'
       JAVA_OPTS: '-XX:MaxRAMPercentage=75 -Xss512k'
     ports:
       - "8080:8080"

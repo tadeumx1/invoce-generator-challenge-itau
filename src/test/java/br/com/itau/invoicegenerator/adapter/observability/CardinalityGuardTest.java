@@ -2,12 +2,14 @@ package br.com.itau.invoicegenerator.adapter.observability;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import br.com.itau.invoicegenerator.adapter.messaging.InvoiceTopics;
 import br.com.itau.invoicegenerator.domain.model.CompanyTaxRegime;
 import br.com.itau.invoicegenerator.domain.model.PersonType;
 import br.com.itau.invoicegenerator.domain.model.Region;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Duration;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +37,12 @@ class CardinalityGuardTest {
     for (RejectionCode reason : RejectionCode.values()) {
       recorder.recordRejected(reason.name());
     }
+    recorder.recordDispatch(InvoiceTopics.STOCK_DEDUCTION, true, Duration.ofMillis(7));
+    recorder.recordDispatch(InvoiceTopics.INVOICE_REGISTRATION, false, Duration.ofMillis(7));
+    recorder.recordDispatch(InvoiceTopics.DELIVERY_SCHEDULING, true, Duration.ofMillis(7));
+    recorder.recordDispatch(InvoiceTopics.ACCOUNTS_RECEIVABLE, true, Duration.ofMillis(7));
+    recorder.recordSideEffect(InvoiceTopics.STOCK_DEDUCTION, System.currentTimeMillis() - 5);
+    recorder.recordSideEffect(InvoiceTopics.INVOICE_REGISTRATION, System.currentTimeMillis() - 5);
 
     for (Meter meter : registry.getMeters()) {
       for (Tag tag : meter.getId().getTags()) {

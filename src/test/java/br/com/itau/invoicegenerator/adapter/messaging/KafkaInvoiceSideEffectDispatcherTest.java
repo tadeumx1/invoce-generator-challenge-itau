@@ -78,7 +78,10 @@ class KafkaInvoiceSideEffectDispatcherTest {
     final List<Call> calls = new ArrayList<>();
 
     RecordingPublisher() {
-      super(null);
+      super(
+          null,
+          new br.com.itau.invoicegenerator.adapter.observability.InvoiceMetricsRecorder(
+              new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
     }
 
     @Override
