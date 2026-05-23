@@ -315,20 +315,23 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
 
 ### M3 — Operations (in flight)
 
-6. **F-OBSERVABILITY** — Spec, design, and tasks frozen. JSON logs via
+6. **F-RESILIENCE** — Resilience4j `@CircuitBreaker` on each of the four outbound
+   adapters with per-port thresholds in `application.properties`. Resolved **C-8**
+   (preserves the interrupt flag and rethrows a typed `IntegrationAdapterException`).
+   `@TimeLimiter` deferred (would force `CompletableFuture` on every port) — see
+   AD-027.
+7. **F-OBSERVABILITY** — Spec, design, and tasks frozen. JSON logs via
    `logstash-logback-encoder`, Micrometer metrics with 4 explicit SLIs (API success
    rate, p99 latency, Kafka dispatch success, side-effect end-to-end), OpenTelemetry
    tracing → Jaeger (local) / X-Ray (AWS). 32 traceable requirements in
    [`.specs/features/observability/spec.md`](.specs/features/observability/spec.md).
    **Implementation pending.**
-7. **F-RESILIENCE** — Resilience4j (circuit-breaker + timeout + retry) per adapter, on
-   top of the Kafka retry/DLT already in place. **Planned.**
 8. **F-AWS** — Terraform for API Gateway HTTP + ECS Fargate + MSK + CloudWatch +
    X-Ray. Authentication (Cognito/JWT) **documented**, not implemented. **Planned.**
 
 ### Notable architectural decisions
 
-Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (24 ADRs total):
+Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (28 ADRs total):
 
 - **AD-009** Clean Architecture with adapter-owned JSON DTOs — domain/application are
   free of Spring and Jackson.
@@ -344,6 +347,10 @@ Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (24 ADRs total)
   non-durable; Kafka beans are gated on an explicit `app.messaging.kafka.enabled`
   property rather than `@ConditionalOnBean` (which is unreliable against
   auto-configurations).
+- **AD-026..AD-028** F-RESILIENCE: Resilience4j Spring Boot 3 starter for circuit
+  breakers; `@TimeLimiter` deferred to avoid forcing `CompletableFuture` on every
+  port; C-8 fix scoped to introduce `IntegrationAdapterException` and preserve the
+  interrupt flag.
 
 ### Where to look for the rest
 

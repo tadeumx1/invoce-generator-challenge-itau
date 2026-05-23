@@ -71,6 +71,12 @@ Layer rules:
 
 ## Defect Status
 
+F-RESILIENCE closed C-8 and added circuit breakers:
+
+- `IntegrationAdapterException` (typed `RuntimeException`) replaces every raw `RuntimeException` wrap around `InterruptedException` in `adapter/integration/**`. The interrupt flag is now preserved (`Thread.currentThread().interrupt();`).
+- `@CircuitBreaker(name="<port>")` annotates each outbound adapter method (Stock, InvoiceRegistration, Delivery, AccountsReceivable). Per-port thresholds live in `application.properties` under `resilience4j.circuitbreaker.instances.<name>.*`.
+- `@TimeLimiter` is intentionally deferred (would force `CompletableFuture` on every port). Documented in AD-027.
+
 F-DEFECTS-FUNCTIONAL resolved the first correctness batch:
 
 - `LegacyProductTaxRateCalculator` is stateless per call (C-1 fixed).

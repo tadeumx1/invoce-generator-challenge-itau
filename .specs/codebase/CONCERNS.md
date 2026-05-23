@@ -76,12 +76,14 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 
 ---
 
-## C-8 — `InterruptedException` discards interrupt flag 🟡 low
+## C-8 — `InterruptedException` discards interrupt flag ✅ resolved in F-RESILIENCE
 
-**Evidence:** Every `Thread.sleep` site in `adapter/integration/**`.
-**Pattern:** `catch (InterruptedException e) { throw new RuntimeException(e); }`
-**Impact:** Lost interrupt flag; downstream code in pools (executors, schedulers) can't shut down cleanly.
-**Fix:** `Thread.currentThread().interrupt();` before rethrowing, and rethrow as a typed integration exception when moving adapter calls into Kafka consumers. Track under **F-DEFECTS-PERFORMANCE** / **F-RESILIENCE** with retry/DLQ behavior.
+**Previous evidence:** Every `Thread.sleep` site in `adapter/integration/**`.
+**Previous pattern:** `catch (InterruptedException e) { throw new RuntimeException(e); }`
+**Previous impact:** Lost interrupt flag; downstream code in pools (executors, Kafka consumer thread pools) could not shut down cleanly.
+**Resolution:** F-RESILIENCE T1 (2026-05-23) introduced `IntegrationAdapterException` (typed `RuntimeException` carrying the integration name) and rewrote every `Thread.sleep` catch block in `adapter/integration/**` to call `Thread.currentThread().interrupt();` before rethrowing as `IntegrationAdapterException`. See AD-028 in `STATE.md`.
+**Regression coverage:** `CircuitBreakerLifecycleTest` exercises `IntegrationAdapterException` through the Resilience4j circuit breaker to confirm the exception class flows correctly.
+**Residual risk:** none for C-8. A future style convention in `CONVENTIONS.md` ("new adapter sleep sites must preserve the interrupt flag and throw `IntegrationAdapterException`") would help avoid regressions.
 
 ---
 

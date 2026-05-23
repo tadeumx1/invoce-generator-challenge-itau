@@ -96,7 +96,7 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 
 ### Features
 
-**F-RESILIENCE — Resilience4j + Kafka retry/DLQ on outbound adapters** — PLANNED
+**F-RESILIENCE — Resilience4j circuit breakers on outbound adapters** — COMPLETE (2026-05-23, `./mvnw verify` + `./mvnw test -Pslow` green; 65 fast tests including CircuitBreakerLifecycleTest; C-8 closed)
 
 - Timeout + retry-with-backoff + circuit breaker on every outbound port.
 - Per-adapter SLA configured in `application.yml`; documented in `INTEGRATIONS.md`.

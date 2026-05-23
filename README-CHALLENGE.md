@@ -88,8 +88,8 @@ M1 — Qualidade (3/3) ✅
 M2 — Defeitos funcionais (2/2) ✅
   F-DEFECTS-FUNCTIONAL ✅      F-DEFECTS-PERFORMANCE ✅
 
-M3 — Operações (0/3) 🟡
-  F-OBSERVABILITY 🟡 (planejado, ready)   F-RESILIENCE 🔴   F-AWS 🔴
+M3 — Operações (1/3) 🟡
+  F-RESILIENCE ✅   F-OBSERVABILITY 🟡 (planejado, ready)   F-AWS 🔴
 ```
 
 Legenda: ✅ implementado · 🟡 spec/design/tasks frozen, execução pendente · 🔴 planejado.
@@ -120,7 +120,7 @@ Legenda: ✅ implementado · 🟡 spec/design/tasks frozen, execução pendente 
 | Documentação mínima | **transversal** — `README.md`, `CLAUDE.md`, `docs/business-rules.md`, `docs/translation-changelog.md`, todo o `.specs/` | ✅ |
 | Planejamento de deploy e operação | **F-DEFECTS-PERFORMANCE T4** (Dockerfile + docker-compose) + **F-AWS** | 🟡 Local pronto; AWS planejado |
 | Observabilidade (logs, métricas, tracing) | **F-OBSERVABILITY** | 🟡 Spec + design + tasks frozen, execução pendente |
-| Resiliência para integrações lentas/instáveis | **F-DEFECTS-PERFORMANCE T3** (retry/DLT + idempotência) + **F-RESILIENCE** | 🟡 Kafka retry/DLT pronto; circuit-breaker / timeout por adapter no F-RESILIENCE |
+| Resiliência para integrações lentas/instáveis | **F-DEFECTS-PERFORMANCE T3** (retry/DLT + idempotência) + **F-RESILIENCE** (Resilience4j `@CircuitBreaker` + C-8 fix) | ✅ |
 
 ### Proposta de arquitetura → feature responsável
 

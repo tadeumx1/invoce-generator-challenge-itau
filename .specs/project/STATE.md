@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-23
-**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, and F-DEFECTS-PERFORMANCE complete. F-OBSERVABILITY spec + design + tasks frozen (32 reqs, 4 SLIs, 5 vertical-slice tasks). Next up: execute F-OBSERVABILITY → F-RESILIENCE → F-AWS.
+**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, and F-RESILIENCE complete. F-OBSERVABILITY spec + design + tasks frozen (32 reqs, 4 SLIs, 5 vertical-slice tasks). Next up: execute F-OBSERVABILITY → F-AWS.
 
 ---
 
@@ -175,6 +175,27 @@
 **Trade-off:** One more piece of configuration to remember when writing a Spring-context test. Mitigated by the shared `NoOpKafkaTestConfig` plus the same `app.messaging.kafka.enabled=false` line on `@TestPropertySource`.
 **Impact:** Future Kafka-related code should be added under `KafkaMessagingConfig` so it inherits the same gate. F-OBSERVABILITY's Kafka-side bindings will use the same condition.
 
+### AD-026: Resilience4j Spring Boot 3 starter for circuit breaking (2026-05-23)
+
+**Decision:** Use `io.github.resilience4j:resilience4j-spring-boot3` + `resilience4j-micrometer` (2.2.0) for circuit breakers on the four outbound port adapters. Each adapter method is annotated with `@CircuitBreaker(name="<port>")`; the per-port configuration lives in `application.properties` under `resilience4j.circuitbreaker.instances.<name>.*`.
+**Reason:** Resilience4j is the de-facto Spring Boot 3.x circuit-breaker library; the Spring Cloud Circuit Breaker abstraction is itself wrapped around Resilience4j here. Annotation-based wiring keeps the adapters readable and the per-port config externalised so SREs can tune thresholds without code changes. Micrometer bindings come for free.
+**Trade-off:** Adds a third-party dependency outside the Spring Boot BOM (Resilience4j manages its own versioning). The 2.2.x line is compatible with Spring Boot 3.5.
+**Impact:** F-OBSERVABILITY will scrape `resilience4j.circuitbreaker.state{name,state}` and `resilience4j.circuitbreaker.calls{name,kind}` meters automatically once the Prometheus endpoint lands.
+
+### AD-027: Defer `@TimeLimiter` per-call timeout to a follow-up (2026-05-23)
+
+**Decision:** F-RESILIENCE T1 ships with `@CircuitBreaker` only. `@TimeLimiter` is intentionally not adopted because it forces a `CompletableFuture<T>` return type on every adapter method, which would propagate to the domain ports and the consumers without measurable upside for this challenge.
+**Reason:** The downstream "slowness" is a `Thread.sleep` simulation bounded at 5 s (delivery + >5-item trap). The Kafka consumer thread pool can absorb that latency for the demo. A real production deployment with HTTP downstream calls must add `@TimeLimiter` (or its programmatic equivalent) — that work is captured in `Deferred Ideas` and belongs in either a follow-up to F-RESILIENCE or in F-AWS during the move to MSK.
+**Trade-off:** No per-call timeout today. A pathological adapter (e.g., a real downstream hung indefinitely) would still hold the consumer thread until the broker session times out (typically minutes).
+**Impact:** Documented in `INTEGRATIONS.md`/`CONCERNS.md` so it does not get forgotten. Migration to async return types is a one-feature scope when the time comes.
+
+### AD-028: C-8 interrupt-flag fix scope (2026-05-23)
+
+**Decision:** While F-RESILIENCE T1 touches every adapter, replace the legacy `catch (InterruptedException e) { throw new RuntimeException(e); }` pattern with `Thread.currentThread().interrupt();` followed by `throw new IntegrationAdapterException(...)`. The typed exception is a new class in the adapter layer.
+**Reason:** The legacy pattern dropped the interrupt flag, which prevents executors and scheduler pools from shutting down cleanly. Now that the adapter calls run on Kafka consumer threads (which are pooled and need to react to interrupts), the legacy behaviour was an SRE hazard. The typed exception lets Resilience4j and `@RetryableTopic` see a stable exception class while keeping a recognisable type for logs/metrics.
+**Trade-off:** Existing callers must accept `IntegrationAdapterException` as well as plain `RuntimeException`. Since the only callers today are the Kafka consumers (which catch any throwable for retry/DLT), the blast radius is zero.
+**Impact:** C-8 is closed. Future adapters added to `adapter/integration/**` must follow the same pattern; a small code-style note in `CONVENTIONS.md` would be a worthwhile follow-up.
+
 ### AD-005: Terraform as default IaC for the AWS deployment (2026-05-22)
 
 **Decision:** Use Terraform (not CDK) for the IaC artifact under F-AWS.
@@ -250,6 +271,8 @@ None.
 | 020 | F-DEFECTS-PERFORMANCE T3 — @RetryableTopic with 4-attempt backoff + DLT + in-memory IdempotencyStore | 2026-05-23 | (HEAD) | ✅ Done |
 | 021 | F-DEFECTS-PERFORMANCE T4 — multi-stage Dockerfile + docker-compose with cp-kafka 7.7 KRaft | 2026-05-23 | (HEAD) | ✅ Done |
 | 022 | F-DEFECTS-PERFORMANCE T5 — docs cross-link, ROADMAP/STATE/CONCERNS update, final verify | 2026-05-23 | (HEAD) | ✅ Done |
+| 023 | F-RESILIENCE T1 — Resilience4j circuit breakers on 4 outbound adapters; C-8 interrupt-flag fix; CircuitBreakerLifecycleTest | 2026-05-23 | (HEAD) | ✅ Done |
+| 024 | F-RESILIENCE T2 — docs closure (ROADMAP/STATE/CONCERNS/CLAUDE) | 2026-05-23 | (HEAD) | ✅ Done |
 
 > Commits are pending — none of the above is in git yet beyond the initial commit `0780ce3`. To be staged when the user asks.
 

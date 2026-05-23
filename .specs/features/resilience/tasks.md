@@ -1,7 +1,7 @@
 # F-RESILIENCE Tasks
 
 **Spec:** `.specs/features/resilience/spec.md`
-**Status:** Draft
+**Status:** Done (2026-05-23). T1 + T2 landed in commits `<T1>` and `<T2>`.
 **Granularity policy:** 2 consolidated vertical-slice tasks per [[feedback-task-granularity]].
 
 ---
