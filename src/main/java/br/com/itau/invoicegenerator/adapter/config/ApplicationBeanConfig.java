@@ -2,11 +2,8 @@ package br.com.itau.invoicegenerator.adapter.config;
 
 import br.com.itau.invoicegenerator.application.GenerateInvoiceInteractor;
 import br.com.itau.invoicegenerator.application.GenerateInvoiceUseCase;
-import br.com.itau.invoicegenerator.domain.port.AccountsReceivablePort;
-import br.com.itau.invoicegenerator.domain.port.DeliveryPort;
 import br.com.itau.invoicegenerator.domain.port.FreightCalculator;
-import br.com.itau.invoicegenerator.domain.port.InvoiceRegistrationPort;
-import br.com.itau.invoicegenerator.domain.port.StockPort;
+import br.com.itau.invoicegenerator.domain.port.InvoiceSideEffectDispatcher;
 import br.com.itau.invoicegenerator.domain.port.TaxRateCalculator;
 import br.com.itau.invoicegenerator.domain.service.LegacyFreightCalculator;
 import br.com.itau.invoicegenerator.domain.service.LegacyProductTaxRateCalculator;
@@ -37,17 +34,8 @@ public class ApplicationBeanConfig {
       TaxRateTable taxRateTable,
       TaxRateCalculator taxRateCalculator,
       FreightCalculator freightCalculator,
-      StockPort stockPort,
-      InvoiceRegistrationPort invoiceRegistrationPort,
-      DeliveryPort deliveryPort,
-      AccountsReceivablePort accountsReceivablePort) {
+      InvoiceSideEffectDispatcher sideEffectDispatcher) {
     return new GenerateInvoiceInteractor(
-        taxRateTable,
-        taxRateCalculator,
-        freightCalculator,
-        stockPort,
-        invoiceRegistrationPort,
-        deliveryPort,
-        accountsReceivablePort);
+        taxRateTable, taxRateCalculator, freightCalculator, sideEffectDispatcher);
   }
 }

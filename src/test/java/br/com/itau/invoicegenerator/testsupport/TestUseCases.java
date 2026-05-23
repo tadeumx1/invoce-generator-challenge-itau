@@ -7,11 +7,8 @@ import br.com.itau.invoicegenerator.adapter.integration.registration.InvoiceRegi
 import br.com.itau.invoicegenerator.adapter.integration.stock.StockIntegrationAdapter;
 import br.com.itau.invoicegenerator.application.GenerateInvoiceInteractor;
 import br.com.itau.invoicegenerator.application.GenerateInvoiceUseCase;
-import br.com.itau.invoicegenerator.domain.port.AccountsReceivablePort;
-import br.com.itau.invoicegenerator.domain.port.DeliveryPort;
 import br.com.itau.invoicegenerator.domain.port.FreightCalculator;
-import br.com.itau.invoicegenerator.domain.port.InvoiceRegistrationPort;
-import br.com.itau.invoicegenerator.domain.port.StockPort;
+import br.com.itau.invoicegenerator.domain.port.InvoiceSideEffectDispatcher;
 import br.com.itau.invoicegenerator.domain.port.TaxRateCalculator;
 import br.com.itau.invoicegenerator.domain.service.LegacyFreightCalculator;
 import br.com.itau.invoicegenerator.domain.service.TaxRateTable;
@@ -20,51 +17,43 @@ public final class TestUseCases {
 
   private TestUseCases() {}
 
+  /** Use case wired with a no-op side-effect dispatcher; for unit tests of orchestration only. */
   public static GenerateInvoiceUseCase generateInvoiceUseCase(TaxRateCalculator taxRateCalculator) {
-    return generateInvoiceUseCase(
-        taxRateCalculator, noOpStock(), noOpRegistration(), noOpDelivery(), noOpFinance());
+    return generateInvoiceUseCase(taxRateCalculator, noOpDispatcher());
   }
 
+  /**
+   * Use case wired with a dispatcher that invokes the four real integration adapters
+   * <em>synchronously</em>. Mirrors what Kafka consumers will do in T2, so existing
+   * characterization tests (e.g., {@code SlowDeliveryCharacterizationTest}) can still observe the
+   * full pre-Kafka latency behavior. T2 will flip those tests to assert HTTP-bounded latency on the
+   * request path and slow latency on the consumer path.
+   */
   public static GenerateInvoiceUseCase generateInvoiceUseCaseWithRealAdapters(
       TaxRateCalculator taxRateCalculator) {
-    return generateInvoiceUseCase(
-        taxRateCalculator,
-        new StockIntegrationAdapter(),
-        new InvoiceRegistrationAdapter(),
-        new DeliveryIntegrationAdapter(new DeliverySchedulingClient()),
-        new AccountsReceivableAdapter());
+    StockIntegrationAdapter stock = new StockIntegrationAdapter();
+    InvoiceRegistrationAdapter registration = new InvoiceRegistrationAdapter();
+    DeliveryIntegrationAdapter delivery =
+        new DeliveryIntegrationAdapter(new DeliverySchedulingClient());
+    AccountsReceivableAdapter finance = new AccountsReceivableAdapter();
+    InvoiceSideEffectDispatcher inlineDispatcher =
+        invoice -> {
+          stock.sendInvoiceForStockDeduction(invoice);
+          registration.registerInvoice(invoice);
+          delivery.scheduleDelivery(invoice);
+          finance.sendInvoiceToAccountsReceivable(invoice);
+        };
+    return generateInvoiceUseCase(taxRateCalculator, inlineDispatcher);
   }
 
   private static GenerateInvoiceUseCase generateInvoiceUseCase(
-      TaxRateCalculator taxRateCalculator,
-      StockPort stockPort,
-      InvoiceRegistrationPort invoiceRegistrationPort,
-      DeliveryPort deliveryPort,
-      AccountsReceivablePort accountsReceivablePort) {
+      TaxRateCalculator taxRateCalculator, InvoiceSideEffectDispatcher sideEffectDispatcher) {
     FreightCalculator freightCalculator = new LegacyFreightCalculator();
     return new GenerateInvoiceInteractor(
-        new TaxRateTable(),
-        taxRateCalculator,
-        freightCalculator,
-        stockPort,
-        invoiceRegistrationPort,
-        deliveryPort,
-        accountsReceivablePort);
+        new TaxRateTable(), taxRateCalculator, freightCalculator, sideEffectDispatcher);
   }
 
-  private static StockPort noOpStock() {
-    return ignored -> {};
-  }
-
-  private static InvoiceRegistrationPort noOpRegistration() {
-    return ignored -> {};
-  }
-
-  private static DeliveryPort noOpDelivery() {
-    return ignored -> {};
-  }
-
-  private static AccountsReceivablePort noOpFinance() {
+  private static InvoiceSideEffectDispatcher noOpDispatcher() {
     return ignored -> {};
   }
 }

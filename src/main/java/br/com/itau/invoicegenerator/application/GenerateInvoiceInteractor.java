@@ -3,11 +3,8 @@ package br.com.itau.invoicegenerator.application;
 import br.com.itau.invoicegenerator.domain.model.Invoice;
 import br.com.itau.invoicegenerator.domain.model.InvoiceItem;
 import br.com.itau.invoicegenerator.domain.model.Order;
-import br.com.itau.invoicegenerator.domain.port.AccountsReceivablePort;
-import br.com.itau.invoicegenerator.domain.port.DeliveryPort;
 import br.com.itau.invoicegenerator.domain.port.FreightCalculator;
-import br.com.itau.invoicegenerator.domain.port.InvoiceRegistrationPort;
-import br.com.itau.invoicegenerator.domain.port.StockPort;
+import br.com.itau.invoicegenerator.domain.port.InvoiceSideEffectDispatcher;
 import br.com.itau.invoicegenerator.domain.port.TaxRateCalculator;
 import br.com.itau.invoicegenerator.domain.service.TaxRateTable;
 import java.time.LocalDateTime;
@@ -20,26 +17,17 @@ public class GenerateInvoiceInteractor implements GenerateInvoiceUseCase {
   private final TaxRateTable taxRateTable;
   private final TaxRateCalculator taxRateCalculator;
   private final FreightCalculator freightCalculator;
-  private final StockPort stockPort;
-  private final InvoiceRegistrationPort invoiceRegistrationPort;
-  private final DeliveryPort deliveryPort;
-  private final AccountsReceivablePort accountsReceivablePort;
+  private final InvoiceSideEffectDispatcher sideEffectDispatcher;
 
   public GenerateInvoiceInteractor(
       TaxRateTable taxRateTable,
       TaxRateCalculator taxRateCalculator,
       FreightCalculator freightCalculator,
-      StockPort stockPort,
-      InvoiceRegistrationPort invoiceRegistrationPort,
-      DeliveryPort deliveryPort,
-      AccountsReceivablePort accountsReceivablePort) {
+      InvoiceSideEffectDispatcher sideEffectDispatcher) {
     this.taxRateTable = taxRateTable;
     this.taxRateCalculator = taxRateCalculator;
     this.freightCalculator = freightCalculator;
-    this.stockPort = stockPort;
-    this.invoiceRegistrationPort = invoiceRegistrationPort;
-    this.deliveryPort = deliveryPort;
-    this.accountsReceivablePort = accountsReceivablePort;
+    this.sideEffectDispatcher = sideEffectDispatcher;
   }
 
   @Override
@@ -61,10 +49,10 @@ public class GenerateInvoiceInteractor implements GenerateInvoiceUseCase {
             .recipient(order.getRecipient())
             .build();
 
-    stockPort.sendInvoiceForStockDeduction(invoice);
-    invoiceRegistrationPort.registerInvoice(invoice);
-    deliveryPort.scheduleDelivery(invoice);
-    accountsReceivablePort.sendInvoiceToAccountsReceivable(invoice);
+    // Side effects are dispatched asynchronously through Kafka (see adapter/messaging).
+    // HTTP success means: invoice generated + Kafka publication accepted. It does NOT mean
+    // stock, fiscal registration, delivery, and finance have completed.
+    sideEffectDispatcher.dispatch(invoice);
 
     return invoice;
   }
