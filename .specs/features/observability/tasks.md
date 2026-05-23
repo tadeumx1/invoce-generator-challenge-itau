@@ -2,7 +2,7 @@
 
 **Design:** `.specs/features/observability/design.md`
 **Spec:** `.specs/features/observability/spec.md`
-**Status:** Draft
+**Status:** Done (2026-05-23)
 **Granularity policy:** consolidated vertical slices (5 tasks). Per user preference, each
 task is one atomic commit covering one coherent observability slice rather than per-file
 sub-tasks. Co-located tests remain a hard rule (TESTING.md coverage matrix).
@@ -68,18 +68,18 @@ without traces yet).
 
 **Done when:**
 
-- [ ] `pom.xml` declares: `spring-boot-starter-actuator`,
+- [x] `pom.xml` declares: `spring-boot-starter-actuator`,
       `micrometer-registry-prometheus`, `micrometer-tracing-bridge-otel`,
       `opentelemetry-exporter-otlp`, and `net.logstash.logback:logstash-logback-encoder`
       with explicit `<version>8.0</version>` (the only pinned version; everything else
       managed by Spring Boot 3.5.14 parent).
-- [ ] `./mvnw spring-boot:run` exposes `/actuator/health` (200) and `/actuator/prometheus`
+- [x] `./mvnw spring-boot:run` exposes `/actuator/health` (200) and `/actuator/prometheus`
       (200 with `http_server_requests_*` after one warm-up request) on port 8081.
-- [ ] Default app port stays 8080.
-- [ ] All log output to stdout is valid single-line JSON parseable by `jq -c .`.
-- [ ] No PII or invoice payload bodies appear in logs from the test suite.
-- [ ] Gate check passes: `./mvnw verify`
-- [ ] Test count: 56 existing tests + 1 new (`ActuatorPrometheusIntegrationTest`) =
+- [x] Default app port stays 8080.
+- [x] All log output to stdout is valid single-line JSON parseable by `jq -c .`.
+- [x] No PII or invoice payload bodies appear in logs from the test suite.
+- [x] Gate check passes: `./mvnw verify`
+- [x] Test count: 56 existing tests + 1 new (`ActuatorPrometheusIntegrationTest`) =
       57 tests pass (no silent deletions).
 
 **Tests:** integration (Spring context + MockMvc against Actuator endpoints).
@@ -133,20 +133,20 @@ wiring with consumers in T4), OBS-06, OBS-07.
 
 **Done when:**
 
-- [ ] `X-Correlation-Id: probe-123` on a request is echoed back on the response and
+- [x] `X-Correlation-Id: probe-123` on a request is echoed back on the response and
       appears as `correlationId=probe-123` in every JSON log line emitted while the
       request is processed.
-- [ ] A request without the header gets a generated UUID; the same UUID is echoed and
+- [x] A request without the header gets a generated UUID; the same UUID is echoed and
       logged.
-- [ ] Header value validation: only `^[A-Za-z0-9_-]{1,128}$` is accepted; longer/invalid
+- [x] Header value validation: only `^[A-Za-z0-9_-]{1,128}$` is accepted; longer/invalid
       values cause a fresh UUID and a WARN log.
-- [ ] Every log line in `mvn test` output that includes `correlationId` is parseable by
+- [x] Every log line in `mvn test` output that includes `correlationId` is parseable by
       `jq -c .` (smoke check in `CorrelationIdHttpIntegrationTest`).
-- [ ] `MdcRestoringRecordInterceptor` exists, is unit-tested on a fake `ConsumerRecord`
+- [x] `MdcRestoringRecordInterceptor` exists, is unit-tested on a fake `ConsumerRecord`
       with and without each header, and lives in the package where F-DEFECTS-PERFORMANCE
       will pick it up.
-- [ ] Gate check passes: `./mvnw verify`
-- [ ] Test count: 59 tests pass (57 from T1 + 2 new).
+- [x] Gate check passes: `./mvnw verify`
+- [x] Test count: 59 tests pass (57 from T1 + 2 new).
 
 **Tests:** unit (`CorrelationIdFilterTest`,
 `MdcRestoringRecordInterceptorTest`) + integration (`CorrelationIdHttpIntegrationTest`).
@@ -197,19 +197,19 @@ already populated — better logs at no extra cost).
 
 **Done when:**
 
-- [ ] After one successful POST, `/actuator/prometheus` returns
+- [x] After one successful POST, `/actuator/prometheus` returns
       `invoice_generated_total{tax_regime, region, person_type, large_order}`.
-- [ ] After one rejected POST (e.g., `JURIDICA + OUTROS`), `/actuator/prometheus`
+- [x] After one rejected POST (e.g., `JURIDICA + OUTROS`), `/actuator/prometheus`
       returns `invoice_rejected_total{reason="UNSUPPORTED_TAX_REGIME"} ≥ 1`.
-- [ ] `http_server_requests_seconds_bucket{le="0.3"|"0.8"|"2.0"}` lines exist for
+- [x] `http_server_requests_seconds_bucket{le="0.3"|"0.8"|"2.0"}` lines exist for
       `uri="/api/orders/generate-invoice"`.
-- [ ] `CardinalityGuardTest` enumerates every meter and asserts none has a tag named in
+- [x] `CardinalityGuardTest` enumerates every meter and asserts none has a tag named in
       the forbidden list.
-- [ ] `RejectionCode` enum is the single source of truth used by both
+- [x] `RejectionCode` enum is the single source of truth used by both
       `ApiExceptionHandler` and `InvoiceMetricsRecorder`; a parameterised test asserts
       every value emitted by the handler is in the recorder's allow-list.
-- [ ] Gate check passes: `./mvnw verify`
-- [ ] Test count: 62 tests pass (59 from T2 + 3 new).
+- [x] Gate check passes: `./mvnw verify`
+- [x] Test count: 62 tests pass (59 from T2 + 3 new).
 
 **Tests:** unit (`InvoiceMetricsRecorderTest`, `CardinalityGuardTest`) + integration
 (`MetricsIntegrationTest`).
@@ -284,20 +284,20 @@ OBS-17, OBS-18, OBS-19, OBS-20, OBS-21, OBS-22 (env-var-driven), OBS-23, OBS-28
 
 **Done when:**
 
-- [ ] A request with a known `correlationId` produces log lines that ALL carry the
+- [x] A request with a known `correlationId` produces log lines that ALL carry the
       same `traceId` (asserted in `HttpTracePropagationIntegrationTest`).
-- [ ] When run under `docker compose up` with Jaeger available, the Jaeger UI shows
+- [x] When run under `docker compose up` with Jaeger available, the Jaeger UI shows
       a trace with at least: HTTP server span → `invoice.generate` child span.
-- [ ] When F-DEFECTS-PERFORMANCE producers are wired, the trace also shows 4 ×
+- [x] When F-DEFECTS-PERFORMANCE producers are wired, the trace also shows 4 ×
       `messaging.publish` child spans, each carrying the `traceparent` header.
-- [ ] `invoice_dispatch_total{topic, outcome}` and `invoice_dispatch_duration_seconds`
+- [x] `invoice_dispatch_total{topic, outcome}` and `invoice_dispatch_duration_seconds`
       appear on `/actuator/prometheus` after a successful POST when producers exist;
       when they don't, the test is `@Disabled("Pending F-DEFECTS-PERFORMANCE")` with
       a clear TODO comment pointing at the producer adapter class.
-- [ ] `invoice_sideeffect_duration_seconds{topic}` exists on the consumer-side
+- [x] `invoice_sideeffect_duration_seconds{topic}` exists on the consumer-side
       (same conditional disable rule).
-- [ ] Gate check passes: `./mvnw verify`
-- [ ] Test count: 65 tests pass (62 from T3 + 3 new), plus N disabled tests where N
+- [x] Gate check passes: `./mvnw verify`
+- [x] Test count: 65 tests pass (62 from T3 + 3 new), plus N disabled tests where N
       equals the count of Kafka-dependent assertions that defer to F-DEFECTS-PERFORMANCE.
 
 **Tests:** unit (`UseCaseObservationTest`, `KafkaHeaderEnricherTest`) + integration
@@ -351,21 +351,21 @@ from spec.md.
 
 **Done when:**
 
-- [ ] `docs/observability.md` includes one Prometheus query per SLI, each query
+- [x] `docs/observability.md` includes one Prometheus query per SLI, each query
       copy-pasteable into Prometheus and returning a numeric ratio against the running
       app.
-- [ ] Manual run: `curl ...` + Prometheus query produces a ratio in `[0, 1]` for SLI-1
+- [x] Manual run: `curl ...` + Prometheus query produces a ratio in `[0, 1]` for SLI-1
       and SLI-3 against a single request.
-- [ ] `CLAUDE.md` Observability section now references `docs/observability.md` as the
+- [x] `CLAUDE.md` Observability section now references `docs/observability.md` as the
       operator-facing detail.
-- [ ] `README.md` documents the two ports (`8080` app, `8081` management), the
+- [x] `README.md` documents the two ports (`8080` app, `8081` management), the
       `/actuator/prometheus` endpoint, the local Jaeger URL, and points at
       `docs/observability.md`.
-- [ ] Every spec.md §Success Criteria checkbox is ticked or has a documented "blocked
+- [x] Every spec.md §Success Criteria checkbox is ticked or has a documented "blocked
       by F-DEFECTS-PERFORMANCE / F-RESILIENCE" annotation.
-- [ ] ROADMAP marks F-OBSERVABILITY COMPLETE.
-- [ ] Gate check passes: `./mvnw verify`
-- [ ] Test count: 65 tests pass (no new tests in T5 — pure documentation + verification).
+- [x] ROADMAP marks F-OBSERVABILITY COMPLETE.
+- [x] Gate check passes: `./mvnw verify`
+- [x] Test count: 65 tests pass (no new tests in T5 — pure documentation + verification).
 
 **Tests:** none (documentation + checklist verification).
 **Gate:** full.

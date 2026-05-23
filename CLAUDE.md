@@ -103,7 +103,10 @@ The main safety net is 56 fast tests plus the slow profile on demand:
 
 No current tests use Mockito; it is excluded from the test starter to keep Spring tests runnable in restricted JVM environments.
 
-## Observability (F-OBSERVABILITY, planned)
+## Observability (F-OBSERVABILITY, complete)
+
+Operator-facing reference (SLI catalog, Prometheus queries, runbook):
+[`docs/observability.md`](docs/observability.md).
 
 The spec at `.specs/features/observability/spec.md` freezes four SLIs that every Micrometer
 counter, timer, and histogram in this codebase exists to serve:

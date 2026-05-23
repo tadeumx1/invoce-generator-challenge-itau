@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-23
-**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, and F-RESILIENCE complete. F-OBSERVABILITY spec + design + tasks frozen (32 reqs, 4 SLIs, 5 vertical-slice tasks). Next up: execute F-OBSERVABILITY → F-AWS.
+**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, and F-OBSERVABILITY complete. 88 fast tests passing; `docs/observability.md` published as the operator SSOT (4 SLIs, Prometheus queries, per-SLI runbook). Next up: F-AWS.
 
 ---
 
@@ -195,6 +195,28 @@
 **Reason:** The legacy pattern dropped the interrupt flag, which prevents executors and scheduler pools from shutting down cleanly. Now that the adapter calls run on Kafka consumer threads (which are pooled and need to react to interrupts), the legacy behaviour was an SRE hazard. The typed exception lets Resilience4j and `@RetryableTopic` see a stable exception class while keeping a recognisable type for logs/metrics.
 **Trade-off:** Existing callers must accept `IntegrationAdapterException` as well as plain `RuntimeException`. Since the only callers today are the Kafka consumers (which catch any throwable for retry/DLT), the blast radius is zero.
 **Impact:** C-8 is closed. Future adapters added to `adapter/integration/**` must follow the same pattern; a small code-style note in `CONVENTIONS.md` would be a worthwhile follow-up.
+
+### AD-029: F-OBSERVABILITY audit — registered ≠ wired (2026-05-23)
+
+**Decision:** During F-OBSERVABILITY T5 audit, the T3 commit (`8ec1421`) had landed
+`InvoiceMetricsRecorder` and `RejectionCode` as beans but never modified
+`InvoiceController` or `ApiExceptionHandler` to call them — the commit message claimed the
+wiring existed but the diff showed only new files. Same gap had been left in T2 for the
+`MdcRestoringRecordInterceptor` (declared as a bean, never attached to a listener container
+factory). Both were closed under T4/T5: T4 wired the interceptor via a custom
+`kafkaListenerContainerFactory` with `CompositeRecordInterceptor`; T5 wired
+`recordGenerated`/`recordRejected` in the controller and handler and added
+`MetricsIntegrationTest` (3 tests, MockMvc + `/actuator/prometheus` scrape) to prove the
+counters actually increment under real HTTP traffic.
+**Reason:** A bean that compiles and unit-tests green can still be silently unused in
+production. The cardinality guard test catches forbidden tags, but no test was catching
+"recorder never called". `MetricsIntegrationTest` plugs that gap with a scrape-based
+end-to-end assertion that's cheap to extend whenever a new business counter lands.
+**Trade-off:** Three extra Spring-context-loading tests (~10 s each). Worth it — without
+them the recorder is invisible-in-production code that nothing notices.
+**Impact:** Pattern to repeat for every future "recorder/interceptor as bean" feature:
+register *and* attach *and* prove via a scrape/log/trace assertion. Commit message + diff
+must agree, audited at T5 before flipping ROADMAP to COMPLETE.
 
 ### AD-005: Terraform as default IaC for the AWS deployment (2026-05-22)
 

@@ -87,12 +87,15 @@ backwards compatibility.
 docker compose up --build
 ```
 
-Brings up two containers:
+Brings up three containers:
 
 - **`invoice-kafka`** — Confluent `cp-kafka:7.7` in KRaft mode. Internal listener
   `kafka:9092` for the app; external listener on `localhost:29092` for host-side tooling
   (`kafka-console-consumer` and friends).
-- **`invoice-generator`** — the Spring Boot app, exposed on `localhost:8080`.
+- **`invoice-jaeger`** — `jaegertracing/all-in-one`. OTLP HTTP receiver on `:4318`
+  (consumed by the app), Jaeger UI on `localhost:16686`.
+- **`invoice-generator`** — the Spring Boot app, exposed on `localhost:8080`
+  (HTTP) and `localhost:8080/actuator/prometheus` (Prometheus scrape).
 
 The four topics `invoice.stock-deduction.v1`, `invoice.registration.v1`,
 `invoice.delivery-scheduling.v1`, and `invoice.accounts-receivable.v1` are auto-created
@@ -106,6 +109,25 @@ docker compose exec invoice-kafka \
   kafka-console-consumer --bootstrap-server kafka:9092 \
   --topic invoice.delivery-scheduling.v1 --from-beginning
 ```
+
+### Observability — local exploration
+
+```bash
+# Drive some traffic
+curl -s -H 'X-Correlation-Id: probe-1' \
+  -X POST http://localhost:8080/api/orders/generate-invoice \
+  -H 'Content-Type: application/json' \
+  -d @src/main/resources/paylods/teste-pf.json
+
+# Scrape the four SLI source meters
+curl -s http://localhost:8080/actuator/prometheus | grep -E '^(http_server_requests|invoice_)'
+
+# Open the trace (HTTP → invoice.generate → 4 × Kafka producer spans)
+open http://localhost:16686
+```
+
+Full SLI catalog with Prometheus queries and per-SLI runbook entries:
+[`docs/observability.md`](docs/observability.md).
 
 ---
 
@@ -320,12 +342,12 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
    (preserves the interrupt flag and rethrows a typed `IntegrationAdapterException`).
    `@TimeLimiter` deferred (would force `CompletableFuture` on every port) — see
    AD-027.
-7. **F-OBSERVABILITY** — Spec, design, and tasks frozen. JSON logs via
-   `logstash-logback-encoder`, Micrometer metrics with 4 explicit SLIs (API success
-   rate, p99 latency, Kafka dispatch success, side-effect end-to-end), OpenTelemetry
-   tracing → Jaeger (local) / X-Ray (AWS). 32 traceable requirements in
-   [`.specs/features/observability/spec.md`](.specs/features/observability/spec.md).
-   **Implementation pending.**
+7. **F-OBSERVABILITY** — JSON logs via `logstash-logback-encoder`, Micrometer metrics
+   wired to 4 explicit SLIs (API success rate, latency, Kafka dispatch success,
+   side-effect end-to-end), OpenTelemetry tracing through `micrometer-tracing-bridge-otel`
+   → Jaeger (local) / X-Ray (AWS). Operator reference:
+   [`docs/observability.md`](docs/observability.md). Local stack adds Jaeger to the
+   compose file (UI on `localhost:16686`).
 8. **F-AWS** — Terraform for API Gateway HTTP + ECS Fargate + MSK + CloudWatch +
    X-Ray. Authentication (Cognito/JWT) **documented**, not implemented. **Planned.**
 

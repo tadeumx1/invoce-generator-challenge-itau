@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** M1 — Quality foundation
-**Status:** M2 in progress. F-DEFECTS-FUNCTIONAL complete. Next: F-DEFECTS-PERFORMANCE.
+**Current Milestone:** M3 — Operations
+**Status:** F-RESILIENCE + F-OBSERVABILITY complete (2026-05-23). Next: F-AWS.
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 
@@ -104,7 +104,7 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 - Fallback behavior defined for each (e.g., DeliveryPort failing keeps the Kafka message retryable or routes it to DLQ; it does not fail the original HTTP request).
 - Resilience metrics exported (see F-OBSERVABILITY).
 
-**F-OBSERVABILITY — Logs, metrics, tracing, and SLIs** — PLANNED, ready to execute (spec + design + tasks frozen 2026-05-23; 5 tasks in `.specs/features/observability/tasks.md`; unblocked now that F-DEFECTS-PERFORMANCE has landed)
+**F-OBSERVABILITY — Logs, metrics, tracing, and SLIs** — COMPLETE (2026-05-23, `./mvnw verify` green; 88 fast tests including `MetricsIntegrationTest`, `HttpTracePropagationIntegrationTest`, `CardinalityGuardTest`; `docs/observability.md` is the operator-facing SSOT; Jaeger added to docker-compose)
 
 - Structured JSON logs via `logstash-logback-encoder`. MDC carries `correlationId`, `traceId`, `spanId`, and (when known) `invoiceId` / `orderId`. `X-Correlation-Id` header is adopted on inbound and propagated on Kafka headers.
 - Micrometer metrics emitted as raw signals; **the four SLIs are computed in the metrics backend**, not in code:
