@@ -3,17 +3,28 @@ package br.com.itau.invoicegenerator;
 import br.com.itau.invoicegenerator.model.*;
 import br.com.itau.invoicegenerator.service.ProductTaxRateCalculator;
 import br.com.itau.invoicegenerator.service.impl.InvoiceGeneratorServiceImpl;
+import br.com.itau.invoicegenerator.testsupport.Orders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-public class InvoiceGeneratorServiceImplTest {
+/**
+ * SAFETY-27, SAFETY-28, SAFETY-29 — proves that the calculator is now actually injected
+ * (Mockito's @InjectMocks satisfies the single constructor with the @Mock) and that stubs
+ * on the calculator are observed by the SUT.
+ */
+class InvoiceGeneratorServiceImplTest {
 
     @InjectMocks
     private InvoiceGeneratorServiceImpl invoiceGeneratorService;
@@ -22,62 +33,35 @@ public class InvoiceGeneratorServiceImplTest {
     private ProductTaxRateCalculator productTaxRateCalculator;
 
     @BeforeEach
-    public void setup() {
+    void setup() {
         MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    public void shouldGenerateInvoiceForPersonTypeFisicaWithTotalItemsValueLessThan500() {
-        Order order = new Order();
-        order.setTotalItemsValue(400);
-        order.setFreightValue(100);
-        Recipient recipient = new Recipient();
-        recipient.setPersonType(PersonType.FISICA);
-
-        Address address = new Address();
-        address.setPurpose(AddressPurpose.ENTREGA);
-        address.setRegion(Region.SUDESTE);
-        recipient.setAddresses(Arrays.asList(address));
-
-        order.setRecipient(recipient);
-
-        Item item = new Item();
-        item.setUnitPrice(100);
-        item.setQuantity(4);
-        order.setItems(Arrays.asList(item));
+    void usesRateZeroForFisicaUnder500AndReturnsCalculatorResult() {
+        Order order = Orders.fisica(400);
+        InvoiceItem stub = InvoiceItem.builder().itemId("stub").itemTaxValue(0.0).build();
+        when(productTaxRateCalculator.calculateTax(any(), eq(0.0))).thenReturn(List.of(stub));
 
         Invoice invoice = invoiceGeneratorService.generateInvoice(order);
 
-        assertEquals(order.getTotalItemsValue(), invoice.getTotalItemsValue());
+        verify(productTaxRateCalculator).calculateTax(order.getItems(), 0.0);
         assertEquals(1, invoice.getItems().size());
-        assertEquals(0, invoice.getItems().get(0).getItemTaxValue());
+        assertSame(stub, invoice.getItems().get(0), "SAFETY-29: the mock's stub is observed by the SUT");
+        assertEquals(order.getTotalItemsValue(), invoice.getTotalItemsValue());
     }
 
     @Test
-    public void shouldGenerateInvoiceForPersonTypeJuridicaWithLucroPresumidoAndTotalItemsValueGreaterThan5000() {
-        Order order = new Order();
-        order.setTotalItemsValue(6000);
-        order.setFreightValue(100);
-        Recipient recipient = new Recipient();
-        recipient.setPersonType(PersonType.JURIDICA);
-        recipient.setTaxRegime(CompanyTaxRegime.LUCRO_PRESUMIDO);
-
-        Address address = new Address();
-        address.setPurpose(AddressPurpose.ENTREGA);
-        address.setRegion(Region.SUDESTE);
-        recipient.setAddresses(Arrays.asList(address));
-
-        order.setRecipient(recipient);
-
-        Item item = new Item();
-        item.setUnitPrice(1000);
-        item.setQuantity(6);
-        order.setItems(Arrays.asList(item));
+    void usesRate020ForJuridicaLucroPresumidoOver5000AndReturnsCalculatorResult() {
+        Order order = Orders.juridica(6000, CompanyTaxRegime.LUCRO_PRESUMIDO);
+        InvoiceItem stub = InvoiceItem.builder().itemId("stub").itemTaxValue(200.0).build();
+        when(productTaxRateCalculator.calculateTax(any(), eq(0.20))).thenReturn(List.of(stub));
 
         Invoice invoice = invoiceGeneratorService.generateInvoice(order);
 
-        assertEquals(order.getTotalItemsValue(), invoice.getTotalItemsValue());
+        verify(productTaxRateCalculator).calculateTax(order.getItems(), 0.20);
         assertEquals(1, invoice.getItems().size());
-        assertEquals(0.20 * item.getUnitPrice(), invoice.getItems().get(0).getItemTaxValue());
+        assertSame(stub, invoice.getItems().get(0));
+        assertEquals(order.getTotalItemsValue(), invoice.getTotalItemsValue());
     }
 }

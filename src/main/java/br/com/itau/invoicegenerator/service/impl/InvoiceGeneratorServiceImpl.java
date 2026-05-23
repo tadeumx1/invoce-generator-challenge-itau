@@ -13,14 +13,18 @@ import java.util.UUID;
 @Service
 public class InvoiceGeneratorServiceImpl implements InvoiceGeneratorService {
 
+    private final ProductTaxRateCalculator taxRateCalculator;
+
+    public InvoiceGeneratorServiceImpl(ProductTaxRateCalculator taxRateCalculator) {
+        this.taxRateCalculator = taxRateCalculator;
+    }
+
     @Override
     public Invoice generateInvoice(Order order) {
 
         Recipient recipient = order.getRecipient();
         PersonType personType = recipient.getPersonType();
         List<InvoiceItem> invoiceItems = new ArrayList<>();
-
-        ProductTaxRateCalculator taxRateCalculator = new ProductTaxRateCalculator();
 
         if (personType == PersonType.FISICA) {
             double totalItemsValue = order.getTotalItemsValue();
