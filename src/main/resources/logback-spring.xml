@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  F-OBSERVABILITY T1 — JSON logs via logstash-logback-encoder.
+  Every log line is single-line JSON. MDC keys correlationId / traceId / spanId /
+  invoiceId / orderId are included by name; everything else stays out so we do not
+  accidentally leak payload data.
+  Stack traces serialize as the standard "stack_trace" field (single JSON value).
+-->
+<configuration>
+
+  <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="invoice-generator"/>
+
+  <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <customFields>{"service":"${APP_NAME}"}</customFields>
+      <includeMdcKeyName>correlationId</includeMdcKeyName>
+      <includeMdcKeyName>traceId</includeMdcKeyName>
+      <includeMdcKeyName>spanId</includeMdcKeyName>
+      <includeMdcKeyName>invoiceId</includeMdcKeyName>
+      <includeMdcKeyName>orderId</includeMdcKeyName>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="JSON"/>
+  </root>
+
+  <logger name="br.com.itau.invoicegenerator" level="INFO"/>
+</configuration>
