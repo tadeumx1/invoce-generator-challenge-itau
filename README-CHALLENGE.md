@@ -129,7 +129,7 @@ Legenda: ✅ implementado · 🟡 spec/design/tasks frozen, execução pendente 
 | API Gateway | **F-AWS** | 🔴 Planejado (documentado no spec, não implementado) |
 | Autenticação / autorização | **F-AWS** | 🔴 Planejado (Cognito/JWT documentado apenas, não provisionado — escopo definido em `.specs/project/PROJECT.md`) |
 | APIs externas ou internas consumidas | **F-CLEAN** (ports) + **F-DEFECTS-PERFORMANCE** (eventos Kafka) | ✅ Domain ports + 4 tópicos Kafka definidos |
-| Tratamento de integrações lentas | **F-DEFECTS-PERFORMANCE** | ✅ Kafka async dispatch + `@RetryableTopic` + DLT |
+| Tratamento de integrações lentas | **F-DEFECTS-PERFORMANCE** + **F-RESILIENCE** | ✅ Kafka async dispatch + `@RetryableTopic` + DLT; `@CircuitBreaker` por adapter (Resilience4j 2.2.0) |
 | Filas / processamento assíncrono | **F-DEFECTS-PERFORMANCE** | ✅ 4 tópicos `invoice.*.v1` + retry topics + DLT, consumers em grupos isolados |
 | Observabilidade | **F-OBSERVABILITY** | 🟡 4 SLIs explícitos (success rate, p99 latency, Kafka dispatch, side-effect end-to-end) |
 | Estratégia de deploy | **F-DEFECTS-PERFORMANCE T4** + **F-AWS** | 🟡 Dockerfile + docker-compose KRaft prontos; Terraform para ECS/MSK no F-AWS |
