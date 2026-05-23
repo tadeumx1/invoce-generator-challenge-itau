@@ -11,7 +11,7 @@ Read `README.md` and `docs/business-rules.md` before changing behavior. `docs/bu
 ## Hard Constraints
 
 - **Do not modify the input/output JSON payload.** JSON keys remain snake_case Portuguese (`id_pedido`, `valor_total_itens`, `tipo_pessoa`, ...), and enum values remain Portuguese (`FISICA`, `SIMPLES_NACIONAL`, `SUDESTE`, `ENTREGA`, ...). The JSON contract is isolated in `adapter/web/dto`.
-- **Do not simply delete `Thread.sleep` calls.** They simulate slow external integrations. Future work should handle them with async processing, queues, timeouts, retries, and resilience.
+- **Do not simply delete `Thread.sleep` calls.** They simulate slow/asynchronous external integrations. Future work should handle them with Kafka dispatch, retry/DLQ, timeouts, and resilience.
 - The active stack is **Java 21 + Spring Boot 3.5.14**. Use the default JDK 21 shell; no `JAVA_HOME` override is required.
 
 ## Commands
@@ -77,7 +77,9 @@ F-DEFECTS-FUNCTIONAL resolved the first correctness batch:
 - JURIDICA + `taxRegime = OUTROS`/null rejects with HTTP 400 (C-2 fixed).
 - Missing delivery address or delivery address with `region=null` rejects with HTTP 400 (C-3 fixed).
 - Money uses `BigDecimal`; calculated tax/freight round to scale 2 with `HALF_EVEN` (C-4 fixed).
-- There is no fire-and-forget implementation today. The use case calls stock, registration, delivery, and finance ports synchronously. For production async work, prefer durable queue/outbox over detached threads or untracked `CompletableFuture.runAsync`.
+- There is no fire-and-forget implementation today. The use case calls stock, registration, delivery, and finance ports synchronously. F-DEFECTS-PERFORMANCE must replace those direct calls with Kafka producer/consumer dispatch plus retry/DLQ/idempotency, not detached threads or untracked `CompletableFuture.runAsync`.
+- For the technical test, Kafka consumers may live in this same Spring Boot codebase so Docker Compose demonstrates the full flow. In production, invoice-generator should publish events only; stock, fiscal registration, delivery, and accounts-receivable services should own their own consumers.
+- After F-DEFECTS-PERFORMANCE, HTTP success for `POST /api/orders/generate-invoice` should mean the invoice was generated and Kafka dispatch was accepted. It must not imply downstream side effects have already completed.
 - Delivery still adds 5 seconds when invoice item count is greater than 5 (C-6 still open; next feature is F-DEFECTS-PERFORMANCE).
 
 ## Testing Notes

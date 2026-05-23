@@ -60,7 +60,7 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 **Evidence:** `application/GenerateInvoiceInteractor.java` calls four outbound ports synchronously; adapters in `adapter/integration/**` still `Thread.sleep`.
 **Latency budget:** 380 + 500 + 150 + 200 + 250 = **1480 ms** for any order; **+5000 ms** more when `items.size() > 5`.
 **Impact:** Tail latency is unbounded by upstream slowness. The request thread is held throughout. No timeouts; no circuit breakers; no retries; no observability into which leg was slow.
-**Fix:** Move non-critical side effects (stock, finance, optionally delivery) to async dispatch (outbox + SQS/queue worker). Wrap remaining synchronous calls with timeouts and circuit breakers (Resilience4j). Track under **F-RESILIENCE** for the runtime patterns and **F-DEFECTS-PERFORMANCE** for the +5s on >5 items.
+**Fix:** Move all four side effects (stock, invoice registration, delivery, accounts receivable) to Kafka async dispatch. Publish durable integration events after invoice generation; consumers call the downstream adapters with retry/backoff, DLQ handling, and idempotency. Track under **F-DEFECTS-PERFORMANCE** for removing the +5s request-path trap and **F-RESILIENCE** for full runtime hardening.
 
 ---
 
@@ -77,7 +77,7 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 **Evidence:** Every `Thread.sleep` site in `adapter/integration/**`.
 **Pattern:** `catch (InterruptedException e) { throw new RuntimeException(e); }`
 **Impact:** Lost interrupt flag; downstream code in pools (executors, schedulers) can't shut down cleanly.
-**Fix:** `Thread.currentThread().interrupt();` before rethrowing, and rethrow as a typed domain exception (or convert when moving to non-blocking async). Track under **F-CLEAN** since adapters get rewritten there anyway.
+**Fix:** `Thread.currentThread().interrupt();` before rethrowing, and rethrow as a typed integration exception when moving adapter calls into Kafka consumers. Track under **F-DEFECTS-PERFORMANCE** / **F-RESILIENCE** with retry/DLQ behavior.
 
 ---
 

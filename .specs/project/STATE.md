@@ -65,10 +65,38 @@
 
 ### AD-010: Durable async over fire-and-forget threads (2026-05-23)
 
-**Decision:** Do not treat detached threads or untracked `CompletableFuture.runAsync` as the production solution for outbound side effects. Current code stays synchronous until F-DEFECTS-PERFORMANCE/F-RESILIENCE introduces durable async processing.
+**Decision:** Do not treat detached threads or untracked `CompletableFuture.runAsync` as the production solution for outbound side effects. Current code stays synchronous until F-DEFECTS-PERFORMANCE/F-RESILIENCE introduces Kafka-backed durable async processing.
 **Reason:** Fire-and-forget can hide errors, lose work on process shutdown, provide no retry, and weaken traceability.
-**Trade-off:** Request latency remains high until the outbox/queue work is implemented.
-**Impact:** ROADMAP points performance/resilience work toward outbox/queue workers, with `CompletableFuture` only acceptable as a documented transitional step.
+**Trade-off:** Request latency remains high until Kafka producer/consumer dispatch is implemented.
+**Impact:** ROADMAP points performance/resilience work toward Kafka producers/consumers with retry/DLQ, with `CompletableFuture` only acceptable as a documented local experiment.
+
+### AD-013: Kafka for simulated external service calls (2026-05-23)
+
+**Decision:** Every integration adapter/client call currently represented by `Thread.sleep(...)` is treated as a simulated asynchronous external service call. The four side-effect calls after invoice generation must be dispatched through Kafka: stock deduction, invoice registration, delivery scheduling, and accounts receivable.
+**Reason:** These downstream services may be unavailable or slow. Kafka gives a durable async boundary so the HTTP request can return while consumers retry until the service is available or route exhausted failures to DLQ.
+**Trade-off:** The invoice response can no longer mean all downstream side effects have completed; completion becomes eventually consistent and must be observable.
+**Impact:** F-DEFECTS-PERFORMANCE now has a dedicated Kafka spec/tasks folder. F-RESILIENCE and F-AWS should use Kafka/MSK retry/DLQ language instead of generic queue/SQS wording unless the user revisits this decision.
+
+### AD-014: Kafka chosen, SQS noted as simpler AWS alternative (2026-05-23)
+
+**Decision:** Keep Kafka as the chosen implementation for F-DEFECTS-PERFORMANCE because the user explicitly wants Kafka and a local Docker Compose stack with Kafka.
+**Reason:** The roadmap is also a technical demonstration; Kafka makes topics, partitions, consumer groups, retry topics, DLT, and consumer idempotency visible.
+**Trade-off:** For this exact production workload, SQS would likely be simpler in AWS. The four integrations are command-style side effects with one logical consumer each, so they mostly need decoupling, retry, and DLQ rather than Kafka stream replay, long-lived event logs, or many subscriber groups.
+**Impact:** Specs must implement Kafka now, but F-AWS can mention SQS as a lower-operational-complexity alternative if the architecture proposal compares options.
+
+### AD-015: Local consumers in repo, production consumers in downstream services (2026-05-23)
+
+**Decision:** For the technical test, keep Kafka publisher and consumers in this same Spring Boot codebase. For ideal production architecture, invoice-generator publishes only; stock, fiscal registration, delivery, and accounts-receivable services own their consumers.
+**Reason:** The single-repo implementation makes the Kafka flow demonstrable with Docker Compose. The production boundary keeps downstream business behavior with the teams/services that own those domains.
+**Trade-off:** The local implementation is intentionally less decomposed than the production architecture.
+**Impact:** Specs and docs must call same-codebase consumers a local/demo compromise, not the target production ownership model.
+
+### AD-016: HTTP invoice response means generated plus dispatched (2026-05-23)
+
+**Decision:** `POST /api/orders/generate-invoice` returns the generated invoice after domain calculation and successful Kafka publication of downstream integration events.
+**Reason:** The user expects the endpoint to generate the invoice. Making downstream systems async should not make invoice calculation itself async.
+**Trade-off:** HTTP success does not mean stock deduction, fiscal registration, delivery scheduling, or accounts-receivable posting has completed. Those become eventually consistent operations.
+**Impact:** Current JSON response shape remains unchanged for the challenge, but future API evolution should consider explicit processing status or a status endpoint.
 
 ### AD-011: Invalid fiscal/freight inputs reject with typed HTTP 400 (2026-05-23)
 
@@ -176,6 +204,7 @@ In-progress thoughts and action items that don't fit in active tasks.
 - [x] F-DEFECTS-FUNCTIONAL policy chosen and implemented: reject `JURIDICA + OUTROS/null` and missing/null delivery region with typed HTTP 400 responses.
 - [ ] Decide F-AWS compute target (ECS Fargate vs Lambda) before writing Terraform modules. Default lean: ECS Fargate (predictable behavior, no cold starts, fits the synchronous critical path of `RegistrationService`).
 - [ ] Add `.gitignore` entries for `.specs/` if the user wants the spec-driven artifacts kept local (currently included; recommend keeping them committed for review).
+- [ ] During F-DEFECTS-PERFORMANCE, implement Kafka async dispatch for `stockPort`, `invoiceRegistrationPort`, `deliveryPort`, and `accountsReceivablePort` and add retry/DLQ/idempotency coverage.
 
 ---
 

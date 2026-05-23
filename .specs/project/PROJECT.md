@@ -24,6 +24,7 @@
 **Key dependencies (target):**
 
 - `spring-boot-starter-web` — HTTP
+- `spring-kafka` — Kafka producer/consumer integration for asynchronous downstream service calls
 - `resilience4j-spring-boot3` — timeout / circuit breaker / retry
 - `micrometer` + `micrometer-registry-cloudwatch` (or OTel exporter) — metrics
 - `opentelemetry-spring-boot-starter` — distributed tracing → X-Ray
@@ -42,7 +43,7 @@
 - Clean Architecture refactor with explicit use cases and adapters (user-requested, captured as feature **F-CLEAN**).
 - IaC for the AWS deployment proposal (Terraform).
 - Real test suite (unit on domain/use-case, integration on adapters, end-to-end on HTTP).
-- Resilience patterns on outbound integrations (timeouts, circuit breakers, async dispatch for non-critical side effects).
+- Resilience patterns on outbound integrations (Kafka async dispatch for stock, invoice registration, delivery, and accounts receivable; retry/DLQ; timeouts and circuit breakers in consumers/adapters).
 
 **Explicitly out of scope:**
 
@@ -56,5 +57,5 @@
 
 - **Timeline:** none stated by the challenge; goal is correctness + quality over speed.
 - **JSON payload contract is locked.** Per README — input/output JSON keys remain snake_case Portuguese, enum values remain Portuguese (FISICA / SIMPLES_NACIONAL / SUDESTE / …). Java identifiers are English (post-rename).
-- **The `Thread.sleep` calls must not simply be deleted.** They simulate slow upstream systems and the solution must demonstrate how to *handle* slowness, not erase it.
+- **The `Thread.sleep` calls must not simply be deleted.** They simulate slow/asynchronous upstream systems and the solution must demonstrate how to *handle* slowness via Kafka dispatch, retry/DLQ, and resilience, not erase it.
 - **JDK 21 is required.** F-UPGRADE moved the project to Spring Boot 3.5.14 and removed the old Lombok/JDK 16+ incompatibility.
