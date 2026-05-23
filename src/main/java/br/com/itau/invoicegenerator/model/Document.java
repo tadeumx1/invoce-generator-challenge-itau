@@ -12,9 +12,9 @@ import lombok.Setter;
 @Setter
 public class Document {
 
-    @JsonProperty("numero")
-    private String number;
+  @JsonProperty("numero")
+  private String number;
 
-    @JsonProperty("tipo")
-    private DocumentType type;
+  @JsonProperty("tipo")
+  private DocumentType type;
 }

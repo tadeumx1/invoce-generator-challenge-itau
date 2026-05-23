@@ -5,5 +5,5 @@ import br.com.itau.invoicegenerator.model.Order;
 
 public interface InvoiceGeneratorService {
 
-    Invoice generateInvoice(Order order);
+  Invoice generateInvoice(Order order);
 }

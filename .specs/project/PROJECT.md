@@ -57,4 +57,4 @@
 - **Timeline:** none stated by the challenge; goal is correctness + quality over speed.
 - **JSON payload contract is locked.** Per README — input/output JSON keys remain snake_case Portuguese, enum values remain Portuguese (FISICA / SIMPLES_NACIONAL / SUDESTE / …). Java identifiers are English (post-rename).
 - **The `Thread.sleep` calls must not simply be deleted.** They simulate slow upstream systems and the solution must demonstrate how to *handle* slowness, not erase it.
-- **JDK 11 needed until F-UPGRADE lands.** Lombok 1.18.22 (pinned by Spring Boot 2.6.2) is incompatible with JDK 16+. See `CONCERNS.md` C-10 and the `JAVA_HOME` override in `TESTING.md`.
+- **JDK 21 is required.** F-UPGRADE moved the project to Spring Boot 3.5.14 and removed the old Lombok/JDK 16+ incompatibility.

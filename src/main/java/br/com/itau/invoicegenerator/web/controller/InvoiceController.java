@@ -15,12 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/orders")
 public class InvoiceController {
 
-    @Autowired
-    private InvoiceGeneratorService invoiceGeneratorService;
+  @Autowired private InvoiceGeneratorService invoiceGeneratorService;
 
-    @PostMapping("/generate-invoice")
-    public ResponseEntity<Invoice> generateInvoice(@RequestBody Order order) {
-        Invoice invoice = invoiceGeneratorService.generateInvoice(order);
-        return new ResponseEntity<>(invoice, HttpStatus.OK);
-    }
+  @PostMapping("/generate-invoice")
+  public ResponseEntity<Invoice> generateInvoice(@RequestBody Order order) {
+    Invoice invoice = invoiceGeneratorService.generateInvoice(order);
+    return new ResponseEntity<>(invoice, HttpStatus.OK);
+  }
 }

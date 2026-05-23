@@ -1,6 +1,6 @@
 # Code Conventions
 
-These are conventions **observed in the current code** (post-rename to English). They are the *de facto* style — not necessarily the target. The Clean Architecture refactor (F-CLEAN) is expected to introduce additional layer-specific conventions.
+These are conventions **observed in the current code** (post-rename to English and F-UPGRADE). They are the *de facto* style. The Clean Architecture refactor (F-CLEAN) is expected to introduce additional layer-specific conventions.
 
 ## Naming Conventions
 
@@ -18,7 +18,9 @@ These are conventions **observed in the current code** (post-rename to English).
 
 ## Code Organization
 
-**Import order:** No enforced order — files mix project imports, third-party (Lombok, Spring, Jackson), and JDK in arbitrary order. The Java 21 + Spring 3 upgrade is a natural moment to introduce an import-order policy via google-java-format or spotless.
+**Formatting:** Java sources are formatted with Spotless + google-java-format. Run `./mvnw spotless:apply` before committing format-heavy changes.
+
+**Imports:** Checkstyle blocks wildcard, redundant, and unused imports. `./mvnw verify` enforces this via `config/checkstyle/checkstyle.xml`.
 
 **File structure:** typical Java single-class-per-file. Lombok annotations stacked at the top of every model class, then `@JsonProperty` fields. Example: `Recipient.java`.
 
@@ -46,6 +48,6 @@ This is one of the things the refactor will tighten (proper error model, `Thread
 
 **Naming:** `should<Behavior>For<Context>With<Condition>` — verbose, expressive. Example: `shouldGenerateInvoiceForPersonTypeJuridicaWithLucroPresumidoAndTotalItemsValueGreaterThan5000`.
 
-**Layout:** flat — one test class per production class, sitting at the test-tree mirror of the package. Today only `InvoiceGeneratorServiceImplTest` and `InvoiceGeneratorApplicationTests` exist.
+**Layout:** flat — one test class per production class or behavior group, sitting at the test-tree mirror of the package.
 
 **Mock framework:** Mockito with annotation-driven setup (`@Mock`, `@InjectMocks`, `MockitoAnnotations.openMocks`). See `TESTING.md` for the known anti-pattern in current tests.

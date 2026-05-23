@@ -1,11 +1,11 @@
 # Tech Stack
 
-**Analyzed:** 2026-05-22
+**Analyzed:** 2026-05-23
 
 ## Core
 
-- Framework: Spring Boot 2.6.2 *(target: a recent 3.x — README requirement)*
-- Language: Java 11 *(target: Java 21 — README requirement)*
+- Framework: Spring Boot 3.5.14
+- Language: Java 21
 - Runtime: JVM (HotSpot)
 - Package manager: Maven (`./mvnw` wrapper committed)
 
@@ -23,14 +23,12 @@
 - `org.projectlombok:lombok` — model boilerplate (getters/setters/builders)
 - `org.springframework.boot:spring-boot-starter-test` (scope: test) — JUnit 5 + Mockito + Spring Test
 
-> **Toolchain hazard:** Lombok 1.18.22 (transitive via Spring Boot 2.6.2) is incompatible with JDK 16+. The build only succeeds under JDK 11. Resolves with the Java 21 / Spring Boot 3.x upgrade.
-
 ## Testing
 
 - Unit: JUnit Jupiter (transitively from `spring-boot-starter-test`)
 - Integration: `@SpringBootTest` for context-loads smoke test
 - E2E: none
-- Coverage tool: none configured
+- Coverage tool: JaCoCo 0.8.11
 
 ## External Services
 
@@ -39,5 +37,7 @@
 ## Development Tools
 
 - Build wrapper: `./mvnw` (POSIX) / `mvnw.cmd` (Windows)
+- Formatter: Spotless + google-java-format
+- Style checks: Maven Checkstyle plugin using `config/checkstyle/checkstyle.xml`
 - IDE metadata: Eclipse `.classpath` / `.project` / `.settings`, IntelliJ `.idea/`
 - Spring Boot Maven plugin configured with Paketo `paketobuildpacks/builder-jammy-base:latest` for OCI image builds (not yet exercised)

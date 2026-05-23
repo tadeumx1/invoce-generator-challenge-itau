@@ -5,13 +5,13 @@ import br.com.itau.invoicegenerator.port.out.DeliveryIntegrationPort;
 
 public class DeliveryService {
 
-    public void scheduleDelivery(Invoice invoice) {
-        try {
-            // Simulates the delivery scheduling step.
-            Thread.sleep(150);
-            new DeliveryIntegrationPort().createDeliverySchedule(invoice);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+  public void scheduleDelivery(Invoice invoice) {
+    try {
+      // Simulates the delivery scheduling step.
+      Thread.sleep(150);
+      new DeliveryIntegrationPort().createDeliverySchedule(invoice);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
+  }
 }

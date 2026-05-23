@@ -20,9 +20,20 @@ O objetivo do desafio é corrigir os problemas existentes, melhorar a qualidade 
 ## Premissas
 
 - O payload de entrada não deve ser modificado.
-- A aplicação deve ser atualizada para Java 21 e uma versão recente do Spring.
+- A aplicação usa Java 21 e Spring Boot 3.5.x.
 - A solução deve corrigir os problemas funcionais e melhorar a manutenção do código.
 - Boas práticas de desenvolvimento, testes, documentação e deploy devem ser consideradas.
+
+## Execução local
+
+```bash
+./mvnw test
+./mvnw verify
+./mvnw spring-boot:run
+```
+
+O comando `./mvnw verify` é o gate principal: compila em Java 21, executa os testes,
+valida formatação/estilo e gera o relatório JaCoCo em `target/site/jacoco/index.html`.
 
 ## Simulação de integração lenta
 

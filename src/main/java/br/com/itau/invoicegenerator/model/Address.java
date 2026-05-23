@@ -13,24 +13,24 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Address {
-    @JsonProperty("cep")
-    private String zipCode;
+  @JsonProperty("cep")
+  private String zipCode;
 
-    @JsonProperty("logradouro")
-    private String street;
+  @JsonProperty("logradouro")
+  private String street;
 
-    @JsonProperty("numero")
-    private String number;
+  @JsonProperty("numero")
+  private String number;
 
-    @JsonProperty("estado")
-    private String state;
+  @JsonProperty("estado")
+  private String state;
 
-    @JsonProperty("complemento")
-    private String complement;
+  @JsonProperty("complemento")
+  private String complement;
 
-    @JsonProperty("finalidade")
-    private AddressPurpose purpose;
+  @JsonProperty("finalidade")
+  private AddressPurpose purpose;
 
-    @JsonProperty("regiao")
-    private Region region;
+  @JsonProperty("regiao")
+  private Region region;
 }

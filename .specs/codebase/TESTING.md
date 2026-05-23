@@ -2,11 +2,12 @@
 
 ## Test Frameworks
 
-- **Unit / Integration:** JUnit Jupiter 5 (transitive via `spring-boot-starter-test` 2.6.2)
+- **Unit / Integration:** JUnit Jupiter 5 (transitive via `spring-boot-starter-test` 3.5.14)
 - **Mocking:** Mockito (annotation-driven: `@Mock`, `@InjectMocks`, `MockitoAnnotations.openMocks`)
 - **Spring Test:** `@SpringBootTest` for context-loads smoke
 - **E2E:** none
-- **Coverage tool:** none configured
+- **Coverage tool:** JaCoCo 0.8.11
+- **Format/style:** Spotless + google-java-format, Checkstyle import policy
 
 ## Test Organization
 
@@ -51,19 +52,15 @@ None.
                                                               # one method
 ```
 
-**JDK requirement:** must run under JDK 11 (or earlier) until the Java 21 upgrade. Newer JDKs trip the Lombok 1.18.22 / `JCTree.qualid` incompatibility. Use:
+**JDK requirement:** JDK 21. The default shell JDK is expected to work without a `JAVA_HOME` override.
 
-```bash
-JAVA_HOME=/Users/matheustadeu/Library/Java/JavaVirtualMachines/temurin-11.0.20/Contents/Home ./mvnw test
-```
-
-**Configuration:** all defaults. No surefire customization.
+**Configuration:** default test runs exclude `@Tag("slow")`; use `./mvnw test -Pslow` for the slow characterization test.
 
 ## Coverage Targets
 
-**Current:** unmeasured.
-**Goals:** none documented in repo. Plausible targets for the post-refactor state: ≥80 % on domain/use-case layer; ≥60 % on adapters. Final numbers TBD as part of F-SAFETY-NET feature.
-**Enforcement:** none.
+**Current:** measured by JaCoCo on `./mvnw verify`.
+**Goals:** post-refactor target is ≥80 % on domain/use-case layer and ≥60 % on adapters.
+**Enforcement:** report-only for now; no minimum threshold configured yet.
 
 ## Test Coverage Matrix
 
@@ -90,6 +87,6 @@ JAVA_HOME=/Users/matheustadeu/Library/Java/JavaVirtualMachines/temurin-11.0.20/C
 | ---------- | ------------------------------------------------- | ---------------------------------------------------------- |
 | Quick      | After tasks with unit tests only                  | `./mvnw test`                                              |
 | Full       | After tasks involving Spring wiring or integration | `./mvnw test` *(today, all tests live in one suite)*       |
-| Build      | After phase completion                            | `./mvnw clean package`                                     |
+| Build      | After phase completion                            | `./mvnw verify`                                            |
 
-> No lint or formatter is configured in the project. Add `spotless` + `checkstyle` (or `google-java-format`) during F-UPGRADE.
+`./mvnw verify` runs tests, Spotless check, Checkstyle, and the JaCoCo report.

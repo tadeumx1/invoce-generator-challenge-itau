@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** M1 — Quality foundation
-**Status:** In Progress (F-SAFETY-NET complete; F-UPGRADE next)
+**Status:** In Progress (F-SAFETY-NET and F-UPGRADE complete; F-CLEAN next)
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 
@@ -22,13 +22,13 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 - An integration test through `InvoiceController` end-to-end with the two `paylods/` JSON fixtures.
 - Drop the misleading `@Mock` in `InvoiceGeneratorServiceImplTest` (C-5). Wire the calculator as a constructor dep on the service so it's actually mockable.
 
-**F-UPGRADE — Java 21 + Spring Boot 3.x** — PLANNED
+**F-UPGRADE — Java 21 + Spring Boot 3.x** — COMPLETE (2026-05-23, Spring Boot 3.5.14 + Java 21; `./mvnw verify` green)
 
-- Bump `<java.version>` to 21; bump parent to `spring-boot-starter-parent` 3.x latest stable.
-- Migrate `javax.*` → `jakarta.*` (Servlet, Validation if added).
-- Pull a JDK-21-compatible Lombok version (unblocks the toolchain mess in C-10).
-- Add `spotless` (or `google-java-format` Maven plugin) and a `checkstyle` policy so future style drift is mechanical.
-- Add CI command (`./mvnw verify`) and document in `README` / `CLAUDE.md`.
+- Bumped `<java.version>` to 21 and parent to `spring-boot-starter-parent` 3.5.14.
+- Confirmed no `javax.*` imports existed in app/test code, so no `jakarta.*` migration was needed.
+- Spring Boot 3.5.14 dependency management provides a JDK-21-compatible Lombok.
+- Added Spotless + google-java-format and a Checkstyle import policy.
+- Documented `./mvnw verify` as the build/CI gate in `README` and `CLAUDE.md`.
 
 **F-CLEAN — Clean Architecture refactor: use cases + adapters** (user-requested) — PLANNED
 

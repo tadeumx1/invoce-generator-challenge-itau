@@ -107,8 +107,8 @@ This has TWO distinct buggy paths, discovered during F-SAFETY-NET execution and 
 
 ---
 
-## C-10 — Pre-existing Lombok / JDK 16+ build break ⚠️ toolchain
+## C-10 — Pre-existing Lombok / JDK 16+ build break ✅ resolved in F-UPGRADE
 
 **Evidence:** Spring Boot 2.6.2 → Lombok 1.18.22 → fails on JDK 16+ with `NoSuchFieldError: Class com.sun.tools.javac.tree.JCTree$JCImport does not have member field 'com.sun.tools.javac.tree.JCTree qualid'`.
-**Impact:** Builds only succeed under JDK 11. The user's active shell uses JDK 21, so every direct `./mvnw` call needs `JAVA_HOME=…temurin-11.0.20…`.
-**Fix:** Bumping to Spring Boot 3.x + Java 21 (planned under F-UPGRADE) pulls a Lombok version compatible with modern `javac`.
+**Impact:** Before F-UPGRADE, builds only succeeded under JDK 11.
+**Fix:** F-UPGRADE moved the project to Java 21 + Spring Boot 3.5.14. `./mvnw verify` passes on the default JDK 21 shell.

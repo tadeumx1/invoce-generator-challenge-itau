@@ -12,7 +12,7 @@ Read `README.md` (in Portuguese — it's the challenge brief) and `docs/business
 
 - **Do not modify the input/output JSON payload.** JSON keys remain snake_case Portuguese (`id_pedido`, `valor_total_itens`, `tipo_pessoa`, …) and JSON enum values remain Portuguese (`FISICA`, `SIMPLES_NACIONAL`, `SUDESTE`, `ENTREGA`, …). Java-side names have been translated to English; the contract is preserved via `@JsonProperty`. Sample payloads: `src/main/resources/paylods/teste-pf.json` and `teste-pj-simples.json`.
 - **Do not simply delete `Thread.sleep` calls.** They simulate slow external integrations (stock, registration, delivery, finance). The challenge is to handle them properly — async, parallelism, timeouts, resilience — not erase them. In particular, `DeliveryIntegrationPort` has a 5-second sleep when `items.size() > 5`; the comment there explicitly says this represents a real upstream constraint.
-- The target stack is **Java 21 + a recent Spring Boot**. The repo currently sits on Java 11 / Spring Boot 2.6.2 (`pom.xml`) — upgrading is part of the work.
+- The active stack is **Java 21 + Spring Boot 3.5.14**. Use the default JDK 21 shell; no `JAVA_HOME` override is required.
 
 ## Commands
 
@@ -21,6 +21,7 @@ Build / test (Maven wrapper is committed; use it, not a system `mvn`):
 ```bash
 ./mvnw clean package          # full build + tests
 ./mvnw test                   # tests only
+./mvnw verify                 # tests + Spotless + Checkstyle + JaCoCo
 ./mvnw spring-boot:run        # run the app (default port 8080)
 
 # Run a single test class or method
@@ -30,8 +31,9 @@ Build / test (Maven wrapper is committed; use it, not a system `mvn`):
 # Slow characterization tests are excluded by default. Run them via the slow profile:
 ./mvnw test -Pslow
 
-# Coverage report (after F-SAFETY-NET — no enforcement, measurement only):
-./mvnw verify  # → target/site/jacoco/index.html
+# Formatting/style
+./mvnw spotless:apply         # format Java sources with google-java-format
+./mvnw verify                 # also runs Spotless check + Checkstyle
 ```
 
 Exercising the API locally:

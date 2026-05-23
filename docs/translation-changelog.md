@@ -224,7 +224,7 @@ These were considered and deliberately left alone:
 
 ## 11. Build/test status after the rename
 
-- **Compilation** — passes under JDK 11 (the version the pom is wired for). Fails under JDK 16+ because Spring Boot 2.6.2 pulls Lombok 1.18.22, which is incompatible with newer `javac` internals. This is a pre-existing toolchain issue and is one of the things the README's "upgrade to Java 21 + recent Spring Boot" item will fix. Run with `JAVA_HOME=/Users/matheustadeu/Library/Java/JavaVirtualMachines/temurin-11.0.20/Contents/Home ./mvnw test` until the upgrade.
+- **Compilation during the rename** — passed under JDK 11 at the time because the project was still on Spring Boot 2.6.2 / Lombok 1.18.22. F-UPGRADE later resolved this by moving to Java 21 + Spring Boot 3.5.14.
 - **Tests** —
   - `InvoiceGeneratorApplicationTests.contextLoads` ✅
   - `InvoiceGeneratorServiceImplTest.shouldGenerateInvoiceForPersonTypeJuridicaWithLucroPresumidoAndTotalItemsValueGreaterThan5000` ✅

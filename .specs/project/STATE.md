@@ -1,7 +1,7 @@
 # State
 
-**Last Updated:** 2026-05-22
-**Current Work:** F-SAFETY-NET complete. Next: F-UPGRADE (Java 21 + Spring Boot 3.x).
+**Last Updated:** 2026-05-23
+**Current Work:** F-SAFETY-NET and F-UPGRADE complete. Next: F-CLEAN (Clean Architecture refactor).
 
 ---
 
@@ -35,12 +35,26 @@
 **Trade-off:** Larger scope than a "minimum delivery" approach.
 **Impact:** ROADMAP.md has 8 features across 3 milestones.
 
-### AD-006: Pin surefire 3.2.5 + use Maven profile for slow-tag execution (2026-05-22)
+### AD-006: Use Maven profile for slow-tag execution (2026-05-22; updated 2026-05-23)
 
-**Decision:** Surefire 2.22.2 (inherited from Spring Boot 2.6.2) cannot reliably filter by JUnit 5 `@Tag` through CLI overrides. Pinned `maven-surefire-plugin` to 3.2.5 and exposed slow tests via a `<profile id="slow">` rather than CLI properties.
+**Decision:** Surefire 2.22.2 (inherited from the old Spring Boot 2.6.2 baseline) could not reliably filter by JUnit 5 `@Tag` through CLI overrides. Expose slow tests via a `<profile id="slow">` rather than CLI properties. After F-UPGRADE, the explicit Surefire version pin was removed and the Spring Boot 3.5.14 parent manages Surefire 3.5.5.
 **Reason:** Spent ~6 attempts trying `-Dgroups=slow` + `-DexcludedGroups=` combinations against surefire 2.22.2; none worked. 3.2.5 + profile is the simplest stable path. Empty `<excludedGroups></excludedGroups>` in the profile silently fails to override the base — using a sentinel value like `<excludedGroups>none</excludedGroups>` is required.
-**Trade-off:** Pinning surefire 3.2.5 diverges from Spring Boot 2.6.2's BOM. Acceptable: F-UPGRADE will move to Spring Boot 3.x anyway and re-align.
+**Trade-off:** None currently; plugin management is back under the Spring Boot parent.
 **Impact:** Slow tests run via `./mvnw test -Pslow`. Documented in `CLAUDE.md` and the F-SAFETY-NET tasks.
+
+### AD-007: Spring Boot 3.5.14 + Java 21 for F-UPGRADE (2026-05-23)
+
+**Decision:** Upgrade directly from Spring Boot 2.6.2 / Java 11 to Spring Boot 3.5.14 / Java 21.
+**Reason:** 3.5.14 is the newest Spring Boot 3.x parent available in Maven Central at implementation time; the challenge asks for Boot 3.x, not Boot 4.x.
+**Trade-off:** This takes the latest 3.x line rather than the newer 4.x line, preserving the feature scope and avoiding an unnecessary major-version jump.
+**Impact:** `./mvnw verify` runs on the default JDK 21 shell without the old `JAVA_HOME` workaround. Lombok is now managed at a JDK-21-compatible version.
+
+### AD-008: Spotless + Checkstyle as the F-UPGRADE style gate (2026-05-23)
+
+**Decision:** Add Spotless with google-java-format and a Checkstyle import policy. Bind both to `verify`.
+**Reason:** Formatting should be mechanical, and the first enforceable rule should be low-noise: no wildcard, redundant, or unused imports.
+**Trade-off:** The initial Spotless application touched most Java files. This is format-only churn, isolated inside F-UPGRADE.
+**Impact:** `./mvnw verify` is now the CI-style command: tests, formatting check, Checkstyle, and JaCoCo report.
 
 ### AD-005: Terraform as default IaC for the AWS deployment (2026-05-22)
 
@@ -53,12 +67,15 @@
 
 ## Active Blockers
 
-### B-001: Lombok 1.18.22 incompatible with JDK 16+
+None.
+
+## Resolved Blockers
+
+### B-001: Lombok 1.18.22 incompatible with JDK 16+ — resolved 2026-05-23
 
 **Discovered:** 2026-05-22
-**Impact:** Builds fail on the active shell JDK (21); only succeed under JDK 11. Every `./mvnw` invocation needs `JAVA_HOME=/Users/matheustadeu/Library/Java/JavaVirtualMachines/temurin-11.0.20/Contents/Home` until F-UPGRADE lands.
-**Workaround:** Override `JAVA_HOME` per-command. Documented in `.specs/codebase/TESTING.md`.
-**Resolution:** F-UPGRADE removes this entirely (Spring Boot 3 ships a modern Lombok). No action needed before that feature.
+**Impact before fix:** Builds failed on the active shell JDK (21) and only succeeded under JDK 11 with a `JAVA_HOME` override.
+**Resolution:** F-UPGRADE moved the project to Java 21 + Spring Boot 3.5.14. `./mvnw verify` passes on the default JDK 21 shell.
 
 ---
 
@@ -101,6 +118,7 @@
 | 008 | F-SAFETY-NET Phase 1 — calculator → bean, ctor inject, JaCoCo + surefire profile, test builders | 2026-05-22 | (HEAD) | ✅ Done |
 | 009 | F-SAFETY-NET Phase 2 — 9 service test classes (brackets, freight, 4 characterizations)            | 2026-05-22 | (HEAD) | ✅ Done |
 | 010 | F-SAFETY-NET Phase 3 — MockMvc integration + JaCoCo report verified                                | 2026-05-22 | (HEAD) | ✅ Done |
+| 011 | F-UPGRADE — Java 21, Spring Boot 3.5.14, Spotless, Checkstyle, docs/spec updates                    | 2026-05-23 | (HEAD) | ✅ Done |
 
 > Commits are pending — none of the above is in git yet beyond the initial commit `0780ce3`. To be staged when the user asks.
 
