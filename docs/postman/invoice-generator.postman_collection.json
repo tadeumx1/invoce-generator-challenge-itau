@@ -1,0 +1,320 @@
+{
+  "info": {
+    "_postman_id": "a1c5e2f4-7d3b-4f9e-9a21-1c0e8b8b1f01",
+    "name": "invoice-generator",
+    "description": "HTTP collection for the Spring Boot invoice-generator service. Covers the happy paths for both shipped sample payloads (FISICA + JURIDICA SIMPLES_NACIONAL), the legacy alias `POST /api/pedido/gerarNotaFiscal`, and the three documented HTTP 400 rejections (UNSUPPORTED_TAX_REGIME, INVALID_TAX_REGIME, INVALID_DELIVERY_REGION). Every request injects `X-Correlation-Id` so F-OBSERVABILITY MDC / trace correlation is exercised. See `docs/observability.md` for SLI scrape URLs and `docs/postman/README.md` for import + env variable notes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Happy paths",
+      "item": [
+        {
+          "name": "POST /api/orders/generate-invoice — FISICA (teste-pf.json)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('content-type is application/json', function () {",
+                  "  pm.response.to.have.header('Content-Type');",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "});",
+                  "pm.test('returns snake_case Portuguese keys', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id_nota_fiscal');",
+                  "  pm.expect(body).to.have.property('valor_total_itens');",
+                  "  pm.expect(body).to.have.property('valor_frete');",
+                  "  pm.expect(body).to.have.property('destinatario');",
+                  "  pm.expect(body.destinatario.tipo_pessoa).to.eql('FISICA');",
+                  "});",
+                  "pm.test('FISICA totalItemsValue=100 < 500 → tax = 0', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.itens[0].valor_tributo_item).to.eql(0);",
+                  "});",
+                  "pm.test('SUDESTE freight = 10.0 × 1.048 = 10.48', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.valor_frete).to.be.closeTo(10.48, 0.001);",
+                  "});",
+                  "pm.test('response echoes X-Correlation-Id', function () {",
+                  "  pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('postman-pf-happy');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-pf-happy"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 100.0,\n  \"valor_frete\": 10.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Teclado USB\",\n      \"valor_unitario\": 50,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"FISICA\",\n    \"documentos\": [\n      { \"tipo\": \"CPF\", \"numero\": \"88740347095\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"São Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/generate-invoice",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "generate-invoice"]
+            },
+            "description": "Mirror of `src/main/resources/paylods/teste-pf.json`. Exercises the FISICA bracket-0 (totalItemsValue < 500 → tax 0) and SUDESTE freight multiplier 1.048."
+          }
+        },
+        {
+          "name": "POST /api/orders/generate-invoice — JURIDICA SIMPLES_NACIONAL (teste-pj-simples.json)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('returns the JURIDICA recipient', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.destinatario.tipo_pessoa).to.eql('JURIDICA');",
+                  "});",
+                  "pm.test('JURIDICA SIMPLES totalItemsValue=5840 > 5000 → rate 0.19 → 730 × 0.19 = 138.7', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.itens[0].valor_tributo_item).to.be.closeTo(138.7, 0.001);",
+                  "});",
+                  "pm.test('SUDESTE freight = 72 × 1.048 = 75.46 (HALF_EVEN, scale 2)', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.valor_frete).to.be.closeTo(75.46, 0.001);",
+                  "});",
+                  "pm.test('no English keys leaked into the response', function () {",
+                  "  const json = pm.response.text();",
+                  "  ['invoiceId','totalItemsValue','freightValue','itemTaxValue','unitPrice','personType','taxRegime'].forEach(k => {",
+                  "    pm.expect(json).to.not.include('\"' + k + '\"');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-pj-simples-happy"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 5840.0,\n  \"valor_frete\": 72.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Monitor LCD SAMSUNG\",\n      \"valor_unitario\": 730,\n      \"quantidade\": 8\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"JURIDICA\",\n    \"regime_tributacao\": \"SIMPLES_NACIONAL\",\n    \"documentos\": [\n      { \"tipo\": \"CNPJ\", \"numero\": \"49695613000180\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"São Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/generate-invoice",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "generate-invoice"]
+            },
+            "description": "Mirror of `src/main/resources/paylods/teste-pj-simples.json`. Exercises the JURIDICA + SIMPLES_NACIONAL high-bracket (> 5000) rate 0.19."
+          }
+        },
+        {
+          "name": "POST /api/pedido/gerarNotaFiscal — legacy Portuguese alias",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('legacy alias still responds 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('contract is identical to /api/orders/generate-invoice', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id_nota_fiscal');",
+                  "  pm.expect(body.destinatario.tipo_pessoa).to.eql('FISICA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-legacy-alias"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 100.0,\n  \"valor_frete\": 10.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Teclado USB\",\n      \"valor_unitario\": 50,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"FISICA\",\n    \"documentos\": [\n      { \"tipo\": \"CPF\", \"numero\": \"88740347095\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"São Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pedido/gerarNotaFiscal",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pedido", "gerarNotaFiscal"]
+            },
+            "description": "Backwards-compat alias kept for legacy clients (see `InvoiceController` `@PostMapping`). Same handler, same contract."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rejections (HTTP 400)",
+      "item": [
+        {
+          "name": "UNSUPPORTED_TAX_REGIME — JURIDICA + OUTROS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejects with HTTP 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('codigo = UNSUPPORTED_TAX_REGIME', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.codigo).to.eql('UNSUPPORTED_TAX_REGIME');",
+                  "  pm.expect(body.mensagem).to.be.a('string').and.to.have.length.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-reject-outros"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 5840.0,\n  \"valor_frete\": 72.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Monitor LCD SAMSUNG\",\n      \"valor_unitario\": 730,\n      \"quantidade\": 8\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"JURIDICA\",\n    \"regime_tributacao\": \"OUTROS\",\n    \"documentos\": [\n      { \"tipo\": \"CNPJ\", \"numero\": \"49695613000180\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/generate-invoice",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "generate-invoice"]
+            },
+            "description": "JURIDICA + OUTROS is explicitly unsupported (F-DEFECTS-FUNCTIONAL C-2). Domain throws `InvalidInvoiceOrderException(\"UNSUPPORTED_TAX_REGIME\", …)`; web layer maps to 400 and emits `invoice_rejected_total{reason=\"UNSUPPORTED_TAX_REGIME\"}`."
+          }
+        },
+        {
+          "name": "INVALID_TAX_REGIME — JURIDICA without taxRegime",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejects with HTTP 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('codigo = INVALID_TAX_REGIME', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.codigo).to.eql('INVALID_TAX_REGIME');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-reject-missing-regime"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 5840.0,\n  \"valor_frete\": 72.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Monitor LCD SAMSUNG\",\n      \"valor_unitario\": 730,\n      \"quantidade\": 8\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"JURIDICA\",\n    \"documentos\": [\n      { \"tipo\": \"CNPJ\", \"numero\": \"49695613000180\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/generate-invoice",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "generate-invoice"]
+            },
+            "description": "JURIDICA recipient missing `regime_tributacao` is rejected (F-DEFECTS-FUNCTIONAL C-2). Distinct code from UNSUPPORTED_TAX_REGIME so operators can tell \"client sent OUTROS\" from \"client forgot the field\"."
+          }
+        },
+        {
+          "name": "INVALID_DELIVERY_REGION — regiao = null on the delivery address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejects with HTTP 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('codigo = INVALID_DELIVERY_REGION', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.codigo).to.eql('INVALID_DELIVERY_REGION');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-reject-no-region"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 100.0,\n  \"valor_frete\": 10.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Teclado USB\",\n      \"valor_unitario\": 50,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"FISICA\",\n    \"documentos\": [\n      { \"tipo\": \"CPF\", \"numero\": \"88740347095\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": null\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/generate-invoice",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "generate-invoice"]
+            },
+            "description": "Delivery address without a `regiao` value is rejected (F-DEFECTS-FUNCTIONAL C-3). `LegacyFreightCalculator` throws `INVALID_DELIVERY_REGION` because freight cannot be computed without a region multiplier."
+          }
+        }
+      ]
+    }
+  ]
+}

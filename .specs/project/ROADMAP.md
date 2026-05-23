@@ -118,6 +118,13 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 - Backend split mirroring AD-015: local Docker Compose uses Prometheus scrape + OTLP → Jaeger; AWS production uses Micrometer CloudWatch registry + ADOT collector → X-Ray. Same instrumentation code; profile-scoped registry/exporter dependency.
 - Deliverables include `docs/observability.md` with the SLI catalog, Prometheus queries per SLI, and runbook entries; F-AWS reuses the same SLI definitions for CloudWatch dashboards/alarms.
 
+**F-POSTMAN — Postman collection for the HTTP API** — COMPLETE (2026-05-23, quick task `.specs/quick/001-postman-collection`; `docs/postman/invoice-generator.postman_collection.json` + `docs/postman/README.md`; 6 requests, every one with `pm.test()` assertions; runs in Postman or via `npx newman`)
+
+- Two happy-path requests mirroring the shipped sample payloads (`teste-pf.json`, `teste-pj-simples.json`) and one legacy-alias request hitting `POST /api/pedido/gerarNotaFiscal`.
+- Three rejection-path requests proving HTTP 400 + `codigo` contract for `UNSUPPORTED_TAX_REGIME`, `INVALID_TAX_REGIME`, `INVALID_DELIVERY_REGION` (the three codes enumerated in `RejectionCode`).
+- Every request injects `X-Correlation-Id` so the F-OBSERVABILITY MDC / trace correlation is exercised on every Postman call.
+- Single collection variable `baseUrl` (default `http://localhost:8080`) — no separate environment file needed.
+
 **F-AWS — AWS deployment proposal + Terraform IaC** — PLANNED
 
 - Architecture diagram (ADR + Mermaid): API Gateway → ECS Fargate (default) or Lambda (alt) → Kafka/MSK topics + consumers → CloudWatch (logs + metrics) → X-Ray (traces).
