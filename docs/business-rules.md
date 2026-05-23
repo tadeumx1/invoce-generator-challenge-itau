@@ -105,7 +105,7 @@ The base `freightValue` is multiplied by a region-specific factor. The `region` 
 | `SUDESTE`       | 1.048      |
 | `SUL`           | 1.060      |
 
-If no matching address exists (or the matched address has no `region`), the legacy code produces `adjustedFreight = 0`. This is a known defect, listed in §6.
+If no matching address exists, the legacy code produces `adjustedFreight = 0`. If a matching delivery address exists but its `region` is `null`, the legacy code throws `NullPointerException` from `Stream.findFirst()` (`findFirst` rejects null elements). Both are known defects, listed in §6.
 
 ---
 
@@ -128,7 +128,7 @@ These are documented so a refactor can identify them as bugs rather than mistake
 
 1. **Cross-request accumulation.** `ProductTaxRateCalculator` (legacy `CalculadoraAliquotaProduto`) keeps a `static` list of `InvoiceItem`s, so each request's tax items are appended to the previous request's. The correct behavior: each request returns only its own items.
 2. **Stale tax-rate fallback.** When `personType = JURIDICA` with `taxRegime = OUTROS` (or null), no rate is applied and `items` is empty. The correct behavior should be specified by the business (likely: reject the request, or apply a defined default).
-3. **Missing-region freight.** When no delivery/billing address has a region, `adjustedFreight = 0`. The correct behavior should be defined (likely: error, or pass through `freightValue` unchanged).
+3. **Missing-region freight (two distinct broken paths).** (a) When no delivery/billing address has a region, `adjustedFreight = 0`. (b) When a delivery address exists but its `region` is null, the request fails with `NullPointerException` from `Stream.findFirst()`. The correct behavior should be defined (likely: reject 400 in both cases, or pass through `freightValue` unchanged).
 4. **`double` for money.** All monetary fields are `double`. This is acceptable as input/output JSON, but tax math should move to `BigDecimal` with explicit rounding to avoid the inconsistencies external systems reported.
 5. **Synchronous + slow.** The four side effects run sequentially on the request thread; the +5s sleep on orders with more than 5 items makes the request budget unbounded.
 

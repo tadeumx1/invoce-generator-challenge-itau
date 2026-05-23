@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** M1 — Quality foundation
-**Status:** Planning
+**Status:** In Progress (F-SAFETY-NET complete; F-UPGRADE next)
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 
@@ -14,7 +14,7 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 
 ### Features
 
-**F-SAFETY-NET — Real test suite covering the documented business rules** — PLANNED
+**F-SAFETY-NET — Real test suite covering the documented business rules** — COMPLETE (2026-05-22, 53 tests passing + 1 slow on-demand; JaCoCo HTML report wired)
 
 - Unit tests for every tax bracket × person-type × tax-regime combination, with explicit assertions at the bracket edges (500 / 1000 / 2000 / 3500 / 5000).
 - Unit tests for freight multiplier per region (5 cases) and the missing-region fallthrough (currently zeros — keep red, fix in M2).

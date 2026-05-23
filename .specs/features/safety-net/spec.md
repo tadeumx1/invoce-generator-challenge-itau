@@ -72,7 +72,7 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 16. **WHEN** `region=SUL` and `freightValue=100` **THEN** `invoice.freightValue = 106.0`.
 17. **WHEN** `purpose=COBRANCA_ENTREGA` (instead of `ENTREGA`) with `region=SUL` **THEN** the system SHALL still apply the multiplier (the lookup matches both purposes).
 18. **WHEN** the recipient has only addresses with `purpose=COBRANCA` (no delivery) **THEN** the system SHALL set `invoice.freightValue = 0.0` — *characterization of bug C-3; will be flipped in M2*.
-19. **WHEN** the recipient has an address with `purpose=ENTREGA` but `region=null` **THEN** the system SHALL set `invoice.freightValue = 0.0` — *characterization of bug C-3*.
+19. **WHEN** the recipient has an address with `purpose=ENTREGA` but `region=null` **THEN** the system SHALL throw `NullPointerException` from `Stream.findFirst()` — *characterization of bug C-3 (corrected after spec deviation discovered during Execute; the original spec said "freight = 0.0" but the actual behavior is harsher: `findFirst()` rejects nulls)*.
 
 **Independent Test**: Run `./mvnw test -Dtest='*FreightTest'` and observe ≥7 passing cases.
 

@@ -25,7 +25,13 @@ Build / test (Maven wrapper is committed; use it, not a system `mvn`):
 
 # Run a single test class or method
 ./mvnw test -Dtest=InvoiceGeneratorServiceImplTest
-./mvnw test -Dtest=InvoiceGeneratorServiceImplTest#shouldGenerateInvoiceForPersonTypeFisicaWithTotalItemsValueLessThan500
+./mvnw test -Dtest=TaxRateSelectionFisicaTest
+
+# Slow characterization tests are excluded by default. Run them via the slow profile:
+./mvnw test -Pslow
+
+# Coverage report (after F-SAFETY-NET — no enforcement, measurement only):
+./mvnw verify  # → target/site/jacoco/index.html
 ```
 
 Exercising the API locally:

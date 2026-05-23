@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-22
-**Current Work:** Project initialization (no active feature work yet — first feature will be F-SAFETY-NET)
+**Current Work:** F-SAFETY-NET complete. Next: F-UPGRADE (Java 21 + Spring Boot 3.x).
 
 ---
 
@@ -35,6 +35,13 @@
 **Trade-off:** Larger scope than a "minimum delivery" approach.
 **Impact:** ROADMAP.md has 8 features across 3 milestones.
 
+### AD-006: Pin surefire 3.2.5 + use Maven profile for slow-tag execution (2026-05-22)
+
+**Decision:** Surefire 2.22.2 (inherited from Spring Boot 2.6.2) cannot reliably filter by JUnit 5 `@Tag` through CLI overrides. Pinned `maven-surefire-plugin` to 3.2.5 and exposed slow tests via a `<profile id="slow">` rather than CLI properties.
+**Reason:** Spent ~6 attempts trying `-Dgroups=slow` + `-DexcludedGroups=` combinations against surefire 2.22.2; none worked. 3.2.5 + profile is the simplest stable path. Empty `<excludedGroups></excludedGroups>` in the profile silently fails to override the base — using a sentinel value like `<excludedGroups>none</excludedGroups>` is required.
+**Trade-off:** Pinning surefire 3.2.5 diverges from Spring Boot 2.6.2's BOM. Acceptable: F-UPGRADE will move to Spring Boot 3.x anyway and re-align.
+**Impact:** Slow tests run via `./mvnw test -Pslow`. Documented in `CLAUDE.md` and the F-SAFETY-NET tasks.
+
 ### AD-005: Terraform as default IaC for the AWS deployment (2026-05-22)
 
 **Decision:** Use Terraform (not CDK) for the IaC artifact under F-AWS.
@@ -64,6 +71,13 @@
 **Solution:** Left as-is, captured in `CONCERNS.md` C-7 as a deferred cosmetic fix. Sweep with F-UPGRADE.
 **Prevents:** Mixing cosmetic cleanup into a focused-scope refactor.
 
+### L-003: Stream.findFirst() rejects null first-element — C-3 has TWO broken paths, not one (2026-05-22)
+
+**Context:** Writing characterization tests for SAFETY-19 (delivery address with `region=null`) during F-SAFETY-NET execution.
+**Problem:** Spec said the buggy path produces `freight=0` (same as SAFETY-18). Actual behavior: `Stream<Region>::findFirst()` throws `NullPointerException` on a null element — the request fails with HTTP 500, not a silent zero.
+**Solution:** Updated `MissingRegionFreightCharacterizationTest` to `assertThrows(NullPointerException.class, ...)`, marked SPEC_DEVIATION in code, updated `business-rules.md` §6.3 and `CONCERNS.md` C-3 to document both broken paths separately.
+**Prevents:** Assuming code "silently returns wrong value" without actually running it. When characterizing a defect, run the code first.
+
 ### L-002: A rename that "looks behavior-preserving" can still surface latent test ordering bugs
 
 **Context:** After the English rename, `./mvnw test` failed on a test that *had* passed in isolation.
@@ -83,6 +97,10 @@
 | 004 | docs/translation-changelog.md (rename audit)           | 2026-05-22 | (HEAD)  | ✅ Done |
 | 005 | Brownfield mapping (7 docs)                            | 2026-05-22 | (HEAD)  | ✅ Done |
 | 006 | PROJECT.md + ROADMAP.md + STATE.md initialized         | 2026-05-22 | (HEAD)  | ✅ Done |
+| 007 | F-SAFETY-NET spec.md + tasks.md                        | 2026-05-22 | (HEAD)  | ✅ Done |
+| 008 | F-SAFETY-NET Phase 1 — calculator → bean, ctor inject, JaCoCo + surefire profile, test builders | 2026-05-22 | (HEAD) | ✅ Done |
+| 009 | F-SAFETY-NET Phase 2 — 9 service test classes (brackets, freight, 4 characterizations)            | 2026-05-22 | (HEAD) | ✅ Done |
+| 010 | F-SAFETY-NET Phase 3 — MockMvc integration + JaCoCo report verified                                | 2026-05-22 | (HEAD) | ✅ Done |
 
 > Commits are pending — none of the above is in git yet beyond the initial commit `0780ce3`. To be staged when the user asks.
 

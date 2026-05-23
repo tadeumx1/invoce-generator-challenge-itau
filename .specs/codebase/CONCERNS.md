@@ -23,11 +23,29 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 
 ---
 
-## C-3 — Freight zeroes out when no ENTREGA address has a region 🔴 high
+## C-3 — Freight is broken when no ENTREGA address has a usable region 🔴 high
 
-**Evidence:** `service/impl/InvoiceGeneratorServiceImpl.java:89-109`. The address lookup `findFirst().orElse(null)` returns `null` if no address has `purpose ∈ {ENTREGA, COBRANCA_ENTREGA}` or if the matched address has `region = null`. The subsequent `if/else if` chain has no `else`, so `adjustedFreightValue` stays at its initialized `0`.
-**Impact:** Customers can receive a zero freight charge for malformed addresses. Listed in the README as "inconsistências nos valores da nota".
-**Fix:** Reject when no delivery address is present (it's required for delivery scheduling anyway), or pass freight through unchanged with a logged warning. Confirm policy. Track under **F-DEFECTS-FUNCTIONAL**.
+**Evidence:** `service/impl/InvoiceGeneratorServiceImpl.java` — the address lookup:
+
+```java
+Region region = recipient.getAddresses().stream()
+        .filter(a -> a.getPurpose() == AddressPurpose.ENTREGA
+                  || a.getPurpose() == AddressPurpose.COBRANCA_ENTREGA)
+        .map(Address::getRegion)
+        .findFirst()
+        .orElse(null);
+```
+
+This has TWO distinct buggy paths, discovered during F-SAFETY-NET execution and confirmed by tests `MissingRegionFreightCharacterizationTest`:
+
+1. **No delivery address present** (only `COBRANCA` or no addresses match) → `findFirst()` returns `Optional.empty()` → `orElse(null)` produces `region = null` → if/else chain doesn't match → `adjustedFreightValue` stays at its initialized `0`. Silent freight=0.
+2. **Delivery address present but `region = null`** → `findFirst()` is called on a `Stream<Region>` whose first element is `null`. Per Java's `Stream` spec, **`findFirst()` throws `NullPointerException`** on null elements. The request fails with HTTP 500, not silently with freight=0.
+
+**Impact:**
+- Case 1: customers can receive a zero freight charge for malformed addresses (matches the README's "inconsistências nos valores da nota").
+- Case 2: any request with a delivery address missing the region returns 500 — worse than a wrong value, the request fails entirely.
+
+**Fix:** Reject with HTTP 400 when no delivery address is present (it's required for delivery scheduling anyway) and when the delivery address has no region; or pass freight through unchanged with a logged warning. Confirm policy. Track under **F-DEFECTS-FUNCTIONAL**.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Spec:** `.specs/features/safety-net/spec.md`
 **Design:** skipped — choices are standard (JUnit 5 + Mockito + MockMvc, `@ParameterizedTest` for brackets, JaCoCo plugin, surefire `@Tag` for the slow case). Captured inline in each task.
-**Status:** Draft
+**Status:** Done (2026-05-22)
 
 ---
 
