@@ -1,5 +1,6 @@
 package br.com.itau.invoicegenerator.adapter.observability;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,5 +26,10 @@ public class ObservabilityConfig {
   @Bean
   public MdcRestoringRecordInterceptor mdcRestoringRecordInterceptor() {
     return new MdcRestoringRecordInterceptor();
+  }
+
+  @Bean
+  public InvoiceMetricsRecorder invoiceMetricsRecorder(MeterRegistry registry) {
+    return new InvoiceMetricsRecorder(registry);
   }
 }
