@@ -291,7 +291,7 @@ Single Spring context; not [P] with anything in Phase 2 that uses `@SpringBootTe
 
 ### T10: Characterization tests for C-3 (missing-region freight = 0) `[P]`
 
-**What:** Two tests asserting the current buggy behavior: (1) no address with `purpose ∈ {ENTREGA, COBRANCA_ENTREGA}` → `invoice.freightValue == 0.0`; (2) matching address has `region=null` → `invoice.freightValue == 0.0`. Each test name includes a comment block citing C-3 and `business-rules.md` §6.3, so M2 sees the intent.
+**What:** Two tests asserting the current buggy behavior: (1) no address with `purpose ∈ {ENTREGA, COBRANCA_ENTREGA}` → `invoice.freightValue == 0.0`; (2) matching address has `region=null` → `invoice.freightValue == 0.0` after F-CLEAN T11's null-safe lookup. Each test name includes a comment block citing C-3 and `business-rules.md` §6.3, so M2 sees the intent.
 **Where:** create `src/test/java/br/com/itau/invoicegenerator/service/characterization/MissingRegionFreightCharacterizationTest.java`
 
 **Depends on:** T2, T4

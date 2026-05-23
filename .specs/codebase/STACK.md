@@ -13,7 +13,7 @@
 
 - API Style: REST (Spring `@RestController`)
 - Single endpoint: `POST /api/orders/generate-invoice`
-- Database: **none** — there is no persistence layer; downstream "services" are in-process stubs that `Thread.sleep` to simulate latency.
+- Database: **none** — there is no persistence layer; downstream adapters are in-process stubs that `Thread.sleep` to simulate latency.
 - Authentication: **none**
 
 ## Dependencies (`pom.xml`)
@@ -21,18 +21,18 @@
 - `org.springframework.boot:spring-boot-starter-web` — REST + embedded Tomcat
 - `org.springframework.boot:spring-boot-starter` — core
 - `org.projectlombok:lombok` — model boilerplate (getters/setters/builders)
-- `org.springframework.boot:spring-boot-starter-test` (scope: test) — JUnit 5 + Mockito + Spring Test
+- `org.springframework.boot:spring-boot-starter-test` (scope: test) — JUnit 5 + Spring Test; Mockito artifacts are excluded because the current tests use explicit fakes instead.
 
 ## Testing
 
 - Unit: JUnit Jupiter (transitively from `spring-boot-starter-test`)
-- Integration: `@SpringBootTest` for context-loads smoke test
-- E2E: none
+- Integration: `@SpringBootTest` + MockMvc for context and HTTP contract tests
+- E2E: none outside the JVM
 - Coverage tool: JaCoCo 0.8.11
 
 ## External Services
 
-- *None real today.* The codebase has four in-process stubs (`StockService`, `RegistrationService`, `DeliveryService`, `FinanceService`) plus one port (`DeliveryIntegrationPort`) that pretend to call external systems via `Thread.sleep`. See `INTEGRATIONS.md`.
+- *None real today.* The codebase has four in-process outbound adapters (`StockIntegrationAdapter`, `InvoiceRegistrationAdapter`, `DeliveryIntegrationAdapter`, `AccountsReceivableAdapter`) plus `DeliverySchedulingClient`; they pretend to call external systems via `Thread.sleep`. There is no fire-and-forget implementation today. See `INTEGRATIONS.md`.
 
 ## Development Tools
 

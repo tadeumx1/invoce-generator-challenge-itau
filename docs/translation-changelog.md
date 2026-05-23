@@ -135,7 +135,7 @@ Internal variables (not exposed via JSON) also renamed: `aliquota` → `taxRate`
 | --------------------------------- | ------------------------------------ |
 | `POST /api/pedido/gerarNotaFiscal`| `POST /api/orders/generate-invoice`  |
 
-The README only locks the **payload**, not the URL. The endpoint was translated for consistency. If external clients pin the old path, expose `/api/pedido/gerarNotaFiscal` as an alias on `InvoiceController`.
+The README only locks the **payload**, not the URL. The endpoint was translated for consistency, and `/api/pedido/gerarNotaFiscal` remains exposed as a legacy compatibility alias on `InvoiceController`.
 
 ---
 

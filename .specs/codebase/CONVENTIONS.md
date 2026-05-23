@@ -1,53 +1,42 @@
 # Code Conventions
 
-These are conventions **observed in the current code** (post-rename to English and F-UPGRADE). They are the *de facto* style. The Clean Architecture refactor (F-CLEAN) is expected to introduce additional layer-specific conventions.
+These are the current conventions after F-UPGRADE and F-CLEAN.
 
 ## Naming Conventions
 
-**Files:** PascalCase, one public type per file, matches type name. Examples: `Order.java`, `InvoiceGeneratorServiceImpl.java`, `DeliveryIntegrationPort.java`.
+**Files:** PascalCase, one public type per file, matching the type name.
 
-**Packages:** lowercase, dotted, starting at `br.com.itau.invoicegenerator`. Subpackages by layer: `model`, `service`, `service.impl`, `port.out`, `web.controller`.
+**Packages:** lowercase under `br.com.itau.invoicegenerator`, organized by Clean Architecture layer:
 
-**Classes:** PascalCase. Interfaces use plain noun (`InvoiceGeneratorService`), implementations append `Impl` (`InvoiceGeneratorServiceImpl`).
+- `domain.model`, `domain.port`, `domain.service`
+- `application`
+- `adapter.web`, `adapter.web.dto`
+- `adapter.integration.*`
+- `adapter.config`
 
-**Methods:** camelCase, verb-first. Examples: `generateInvoice`, `calculateTax`, `sendInvoiceForStockDeduction`.
+**Classes:** PascalCase. Use case interfaces use action names such as `GenerateInvoiceUseCase`; concrete interactors use `Interactor`. Legacy-preserving services are prefixed with `Legacy` until M2 defect fixes replace them.
 
-**Fields / local variables:** camelCase. Examples: `totalItemsValue`, `adjustedFreightValue`, `taxRate`.
+**Methods:** camelCase, verb-first. Examples: `generateInvoice`, `calculateTax`, `scheduleDelivery`.
 
-**Constants:** none currently in code. Enum constants are SCREAMING_SNAKE_CASE and remain in Portuguese (`FISICA`, `SIMPLES_NACIONAL`, `COBRANCA_ENTREGA`) because they double as the JSON contract values.
+**Enums:** constants remain in Portuguese because enum values are part of the JSON contract (`FISICA`, `SIMPLES_NACIONAL`, `COBRANCA_ENTREGA`).
 
-## Code Organization
+## Layering
 
-**Formatting:** Java sources are formatted with Spotless + google-java-format. Run `./mvnw spotless:apply` before committing format-heavy changes.
+- Domain and application code must not import Spring or Jackson.
+- JSON annotations and request/response DTOs belong in `adapter.web.dto`.
+- Spring annotations belong in adapters/configuration only.
+- Outbound side effects go through `domain.port` interfaces.
 
-**Imports:** Checkstyle blocks wildcard, redundant, and unused imports. `./mvnw verify` enforces this via `config/checkstyle/checkstyle.xml`.
+## Formatting / Imports
 
-**File structure:** typical Java single-class-per-file. Lombok annotations stacked at the top of every model class, then `@JsonProperty` fields. Example: `Recipient.java`.
+Java sources are formatted with Spotless + google-java-format. Checkstyle blocks wildcard, redundant, and unused imports. Use `./mvnw spotless:apply` for formatting and `./mvnw verify` as the full gate.
 
-## Type Safety / Documentation
+## Type Safety / Error Handling
 
-**Approach:** Standard Java types throughout; no `var`, no records. All money handled as primitive `double` (known defect — see `CONCERNS.md` C-4). Collections via `java.util.List`, ArrayList for mutables.
+Money is represented as `BigDecimal` in domain models and web DTOs. Calculated money must go through `Money.rounded`, which applies scale 2 with `RoundingMode.HALF_EVEN`. Tax rates should be created from strings through `TaxRate.of(...)`.
 
-**Nullability:** No annotations (`@Nullable`, `@NonNull`, or `Optional<T>` in fields). Nulls are pervasive (e.g., `Region` can come back null from the address-search and silently zero out freight — see `CONCERNS.md` C-3).
-
-## Error Handling
-
-**Pattern:** `Thread.sleep` calls are wrapped in `try { ... } catch (InterruptedException e) { throw new RuntimeException(e); }` — losing the interrupt flag and not preserving the cause's typed information. There is no application-level exception type; nothing translates domain errors to HTTP responses. The controller has no `@ExceptionHandler` / `@ControllerAdvice`.
-
-**Example:** `StockService.java:8-12`.
-
-This is one of the things the refactor will tighten (proper error model, `Thread.currentThread().interrupt()`, typed exceptions, global handler).
-
-## Comments / Documentation
-
-**Style:** sparse. Existing comments are short, single-line, and English (Portuguese comments were translated during the English rename). Inline comments call out known defects (e.g., `ProductTaxRateCalculator.java:11-12` references `docs/business-rules.md` §6.1).
-
-**Javadoc:** none.
+Domain validation failures use `InvalidInvoiceOrderException` with stable error codes; the web adapter maps those to HTTP 400. Nullability is not yet annotated. Integration sleeps still wrap `InterruptedException` as runtime exceptions; resilience/error modeling is deferred to M3.
 
 ## Tests
 
-**Naming:** `should<Behavior>For<Context>With<Condition>` — verbose, expressive. Example: `shouldGenerateInvoiceForPersonTypeJuridicaWithLucroPresumidoAndTotalItemsValueGreaterThan5000`.
-
-**Layout:** flat — one test class per production class or behavior group, sitting at the test-tree mirror of the package.
-
-**Mock framework:** Mockito with annotation-driven setup (`@Mock`, `@InjectMocks`, `MockitoAnnotations.openMocks`). See `TESTING.md` for the known anti-pattern in current tests.
+Prefer focused tests with explicit fakes over framework mocks. `TestUseCases` builds the application use case without Spring. Slow behavior is tagged `@Tag("slow")` and runs through `./mvnw test -Pslow`.

@@ -2,15 +2,17 @@ package br.com.itau.invoicegenerator.service.characterization;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import br.com.itau.invoicegenerator.model.Item;
-import br.com.itau.invoicegenerator.model.Order;
-import br.com.itau.invoicegenerator.model.PersonType;
-import br.com.itau.invoicegenerator.model.Recipient;
-import br.com.itau.invoicegenerator.model.Region;
-import br.com.itau.invoicegenerator.service.ProductTaxRateCalculator;
-import br.com.itau.invoicegenerator.service.impl.InvoiceGeneratorServiceImpl;
+import br.com.itau.invoicegenerator.application.GenerateInvoiceUseCase;
+import br.com.itau.invoicegenerator.domain.model.Item;
+import br.com.itau.invoicegenerator.domain.model.Money;
+import br.com.itau.invoicegenerator.domain.model.Order;
+import br.com.itau.invoicegenerator.domain.model.PersonType;
+import br.com.itau.invoicegenerator.domain.model.Recipient;
+import br.com.itau.invoicegenerator.domain.model.Region;
+import br.com.itau.invoicegenerator.domain.service.LegacyProductTaxRateCalculator;
 import br.com.itau.invoicegenerator.testsupport.Addresses;
 import br.com.itau.invoicegenerator.testsupport.Items;
+import br.com.itau.invoicegenerator.testsupport.TestUseCases;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -30,8 +32,9 @@ class SlowDeliveryCharacterizationTest {
   @Test
   @Tag("slow")
   void ordersWithMoreThanFiveItemsBlockAtLeastFiveSecondsToday_C6() {
-    ProductTaxRateCalculator calculator = new ProductTaxRateCalculator();
-    InvoiceGeneratorServiceImpl service = new InvoiceGeneratorServiceImpl(calculator);
+    LegacyProductTaxRateCalculator calculator = new LegacyProductTaxRateCalculator();
+    GenerateInvoiceUseCase service =
+        TestUseCases.generateInvoiceUseCaseWithRealAdapters(calculator);
 
     Recipient recipient =
         Recipient.builder()
@@ -49,8 +52,8 @@ class SlowDeliveryCharacterizationTest {
     Order order =
         Order.builder()
             .orderId(1)
-            .totalItemsValue(60.0)
-            .freightValue(10.0)
+            .totalItemsValue(Money.of(60.0))
+            .freightValue(Money.of(10.0))
             .items(sixItems)
             .recipient(recipient)
             .build();

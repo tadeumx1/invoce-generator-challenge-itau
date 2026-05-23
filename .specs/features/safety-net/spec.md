@@ -72,7 +72,7 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 16. **WHEN** `region=SUL` and `freightValue=100` **THEN** `invoice.freightValue = 106.0`.
 17. **WHEN** `purpose=COBRANCA_ENTREGA` (instead of `ENTREGA`) with `region=SUL` **THEN** the system SHALL still apply the multiplier (the lookup matches both purposes).
 18. **WHEN** the recipient has only addresses with `purpose=COBRANCA` (no delivery) **THEN** the system SHALL set `invoice.freightValue = 0.0` — *characterization of bug C-3; will be flipped in M2*.
-19. **WHEN** the recipient has an address with `purpose=ENTREGA` but `region=null` **THEN** the system SHALL throw `NullPointerException` from `Stream.findFirst()` — *characterization of bug C-3 (corrected after spec deviation discovered during Execute; the original spec said "freight = 0.0" but the actual behavior is harsher: `findFirst()` rejects nulls)*.
+19. **WHEN** the recipient has an address with `purpose=ENTREGA` but `region=null` **THEN** the system SHALL return freight `0.0` after F-CLEAN T11. Historical note: F-SAFETY-NET originally discovered a `Stream.findFirst()` NPE here; that accidental exception path was removed without deciding the final M2 policy.
 
 **Independent Test**: Run `./mvnw test -Dtest='*FreightTest'` and observe ≥7 passing cases.
 
@@ -104,7 +104,7 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 **Acceptance Criteria**:
 
 24. **WHEN** `POST /api/orders/generate-invoice` is called with the body of `src/main/resources/paylods/teste-pf.json` **THEN** the system SHALL respond with HTTP 200, `Content-Type: application/json`, and a body containing the keys `id_nota_fiscal`, `data`, `valor_total_itens=100.0`, `valor_frete=10.48` (10 × 1.048 for SUDESTE), `itens[0].valor_tributo_item=0.0` (FISICA < 500 → 0% rate), and `destinatario.tipo_pessoa="FISICA"`.
-25. **WHEN** `POST /api/orders/generate-invoice` is called with the body of `src/main/resources/paylods/teste-pj-simples.json` **THEN** the system SHALL respond with HTTP 200 and a body containing `valor_frete=75.456` (72 × 1.048 SUDESTE), `itens[0].valor_tributo_item=138.7` (730 × 0.19, since `totalItemsValue=5840 > 5000` → SIMPLES_NACIONAL rate 0.19), and `destinatario.tipo_pessoa="JURIDICA"`.
+25. **WHEN** `POST /api/orders/generate-invoice` is called with the body of `src/main/resources/paylods/teste-pj-simples.json` **THEN** the system SHALL respond with HTTP 200 and a body containing `valor_frete=75.456` (72 × 1.048 SUDESTE), `itens[0].valor_tributo_item=138.7` (730 × 0.19, since `totalItemsValue=5840 > 5000` → SIMPLES_NACIONAL rate 0.19), and `destinatario.tipo_pessoa="JURIDICA"`. F-DEFECTS-FUNCTIONAL later changes this expected freight to `75.46` because calculated money is rounded to scale 2.
 26. **WHEN** the request body uses snake_case Portuguese keys **THEN** the response body SHALL also use snake_case Portuguese keys — no English keys SHALL appear in the JSON.
 
 **Independent Test**: Run `./mvnw test -Dtest=InvoiceControllerIntegrationTest` (new). Test uses `MockMvc` against the real Spring context.
@@ -187,7 +187,7 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 | SAFETY-16      | P1 — Freight × SUL                                  | Pending | Pending |
 | SAFETY-17      | P1 — Freight × COBRANCA_ENTREGA purpose             | Pending | Pending |
 | SAFETY-18      | P1 — Characterize: no delivery → freight = 0        | Pending | Pending |
-| SAFETY-19      | P1 — Characterize: null region → freight = 0        | Pending | Pending |
+| SAFETY-19      | P1 — Characterize: null region → freight = 0        | Verified after F-CLEAN T11 | Verified |
 | SAFETY-20      | P1 — Characterize: static-list accumulates (C-1)    | Pending | Pending |
 | SAFETY-21      | P1 — Characterize: OUTROS → items=[]                | Pending | Pending |
 | SAFETY-22      | P1 — Characterize: null taxRegime → items=[]        | Pending | Pending |

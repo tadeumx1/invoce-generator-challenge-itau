@@ -1,12 +1,13 @@
 package br.com.itau.invoicegenerator.testsupport;
 
-import br.com.itau.invoicegenerator.model.Address;
-import br.com.itau.invoicegenerator.model.CompanyTaxRegime;
-import br.com.itau.invoicegenerator.model.Item;
-import br.com.itau.invoicegenerator.model.Order;
-import br.com.itau.invoicegenerator.model.PersonType;
-import br.com.itau.invoicegenerator.model.Recipient;
-import br.com.itau.invoicegenerator.model.Region;
+import br.com.itau.invoicegenerator.domain.model.Address;
+import br.com.itau.invoicegenerator.domain.model.CompanyTaxRegime;
+import br.com.itau.invoicegenerator.domain.model.Item;
+import br.com.itau.invoicegenerator.domain.model.Money;
+import br.com.itau.invoicegenerator.domain.model.Order;
+import br.com.itau.invoicegenerator.domain.model.PersonType;
+import br.com.itau.invoicegenerator.domain.model.Recipient;
+import br.com.itau.invoicegenerator.domain.model.Region;
 import java.util.List;
 
 public final class Orders {
@@ -42,8 +43,8 @@ public final class Orders {
     Item item = Items.item(totalItemsValue, 1);
     return Order.builder()
         .orderId(1)
-        .totalItemsValue(totalItemsValue)
-        .freightValue(100.0)
+        .totalItemsValue(Money.of(totalItemsValue))
+        .freightValue(Money.of(100.0))
         .items(List.of(item))
         .recipient(recipient)
         .build();

@@ -26,9 +26,8 @@ import org.springframework.util.StreamUtils;
  * shipped in src/main/resources/paylods/. Proves the JSON contract (snake_case Portuguese keys) is
  * intact through the whole stack.
  *
- * <p>Uses {@code @DirtiesContext(BEFORE_EACH_TEST_METHOD)} so the calculator's singleton-scoped
- * accumulation bug (C-1) doesn't pollute one test with another's items. M2's C-1 fix removes the
- * need for this.
+ * <p>Uses {@code @DirtiesContext(BEFORE_EACH_TEST_METHOD)} to keep each HTTP test isolated from the
+ * mutable Spring context.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -76,8 +75,8 @@ class InvoiceControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.valor_total_itens").value(closeTo(5840.0, 1e-6)))
-            // 72.0 * 1.048 (SUDESTE)
-            .andExpect(jsonPath("$.valor_frete").value(closeTo(75.456, 1e-6)))
+            // 72.0 * 1.048 (SUDESTE), rounded HALF_EVEN to 2 decimals
+            .andExpect(jsonPath("$.valor_frete").value(closeTo(75.46, 1e-6)))
             // JURIDICA + SIMPLES_NACIONAL + totalItemsValue=5840 > 5000 → rate 0.19 → 730 * 0.19 =
             // 138.7
             .andExpect(jsonPath("$.itens[0].valor_tributo_item").value(closeTo(138.7, 1e-6)))
@@ -85,6 +84,51 @@ class InvoiceControllerIntegrationTest {
             .andReturn();
 
     assertNoEnglishKeysAppearInResponse(result.getResponse().getContentAsString());
+  }
+
+  @Test
+  void keepsPortugueseEndpointAsLegacyCompatibilityAlias() throws Exception {
+    String body = loadFixture("paylods/teste-pf.json");
+
+    mockMvc
+        .perform(
+            post("/api/pedido/gerarNotaFiscal")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.id_nota_fiscal").value(notNullValue()))
+        .andExpect(jsonPath("$.valor_total_itens").value(closeTo(100.0, 1e-6)));
+  }
+
+  @Test
+  void rejectsJuridicaOutrosTaxRegimeWithBadRequest() throws Exception {
+    String body = loadFixture("paylods/teste-pj-simples.json");
+    body =
+        body.replace(
+            "\"regime_tributacao\": \"SIMPLES_NACIONAL\"", "\"regime_tributacao\": \"OUTROS\"");
+
+    mockMvc
+        .perform(
+            post("/api/orders/generate-invoice")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.codigo").value(equalTo("UNSUPPORTED_TAX_REGIME")));
+  }
+
+  @Test
+  void rejectsMissingDeliveryRegionWithBadRequest() throws Exception {
+    String body = loadFixture("paylods/teste-pf.json");
+    body = body.replace("\"regiao\": \"SUDESTE\"", "\"regiao\": null");
+
+    mockMvc
+        .perform(
+            post("/api/orders/generate-invoice")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.codigo").value(equalTo("INVALID_DELIVERY_REGION")));
   }
 
   private static String loadFixture(String classpathLocation) throws Exception {

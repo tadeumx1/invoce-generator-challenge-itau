@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-23
-**Current Work:** F-SAFETY-NET and F-UPGRADE complete. Next: F-CLEAN (Clean Architecture refactor).
+**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, and F-DEFECTS-FUNCTIONAL complete. Next: F-DEFECTS-PERFORMANCE.
 
 ---
 
@@ -56,6 +56,34 @@
 **Trade-off:** The initial Spotless application touched most Java files. This is format-only churn, isolated inside F-UPGRADE.
 **Impact:** `./mvnw verify` is now the CI-style command: tests, formatting check, Checkstyle, and JaCoCo report.
 
+### AD-009: Clean Architecture layering with adapter-owned JSON DTOs (2026-05-23)
+
+**Decision:** Split the code into `domain`, `application`, and `adapter` packages. Keep domain/application free of Spring and Jackson by moving JSON `@JsonProperty` annotations to DTOs under `adapter/web/dto`.
+**Reason:** The next defect-fix phase needs stable use-case and port boundaries before changing behavior.
+**Trade-off:** The web adapter now maps between DTOs and domain models explicitly, adding boilerplate.
+**Impact:** HTTP payloads stay unchanged while business logic becomes testable without Spring or transport concerns.
+
+### AD-010: Durable async over fire-and-forget threads (2026-05-23)
+
+**Decision:** Do not treat detached threads or untracked `CompletableFuture.runAsync` as the production solution for outbound side effects. Current code stays synchronous until F-DEFECTS-PERFORMANCE/F-RESILIENCE introduces durable async processing.
+**Reason:** Fire-and-forget can hide errors, lose work on process shutdown, provide no retry, and weaken traceability.
+**Trade-off:** Request latency remains high until the outbox/queue work is implemented.
+**Impact:** ROADMAP points performance/resilience work toward outbox/queue workers, with `CompletableFuture` only acceptable as a documented transitional step.
+
+### AD-011: Invalid fiscal/freight inputs reject with typed HTTP 400 (2026-05-23)
+
+**Decision:** For F-DEFECTS-FUNCTIONAL, reject unsupported or missing juridica tax regimes and missing/null delivery region with `InvalidInvoiceOrderException`, mapped by the web adapter to HTTP 400 and JSON fields `codigo` and `mensagem`.
+**Reason:** The previous behavior hid data quality problems by returning `items=[]` or `freightValue=0`, which matched the README's reported value inconsistencies.
+**Trade-off:** Some malformed requests that previously returned 200 now fail fast. This is intentional because those 200 responses were wrong invoices.
+**Impact:** C-2 and C-3 are resolved. Future validation can add Bean Validation, but the domain policy is already explicit.
+
+### AD-012: BigDecimal money with HALF_EVEN scale 2 (2026-05-23)
+
+**Decision:** Use `BigDecimal` for domain and DTO monetary fields. Calculated money is rounded with scale 2 and `RoundingMode.HALF_EVEN`.
+**Reason:** Primitive `double` arithmetic is unsuitable for invoice money and was tracked as C-4.
+**Trade-off:** Values like `72 × 1.048` now return `75.46` instead of `75.456`. The API still serializes numbers, but calculated values are now BRL-scale.
+**Impact:** C-4 is resolved. Tests compare `BigDecimal` values semantically.
+
 ### AD-005: Terraform as default IaC for the AWS deployment (2026-05-22)
 
 **Decision:** Use Terraform (not CDK) for the IaC artifact under F-AWS.
@@ -93,6 +121,7 @@ None.
 **Context:** Writing characterization tests for SAFETY-19 (delivery address with `region=null`) during F-SAFETY-NET execution.
 **Problem:** Spec said the buggy path produces `freight=0` (same as SAFETY-18). Actual behavior: `Stream<Region>::findFirst()` throws `NullPointerException` on a null element — the request fails with HTTP 500, not a silent zero.
 **Solution:** Updated `MissingRegionFreightCharacterizationTest` to `assertThrows(NullPointerException.class, ...)`, marked SPEC_DEVIATION in code, updated `business-rules.md` §6.3 and `CONCERNS.md` C-3 to document both broken paths separately.
+**Update 2026-05-23:** F-CLEAN T11 removed the accidental NPE path by mapping `Address::getRegion` after finding the matching address. F-DEFECTS-FUNCTIONAL then closed the policy gap by rejecting missing/null delivery region with HTTP 400 and code `INVALID_DELIVERY_REGION`.
 **Prevents:** Assuming code "silently returns wrong value" without actually running it. When characterizing a defect, run the code first.
 
 ### L-002: A rename that "looks behavior-preserving" can still surface latent test ordering bugs
@@ -119,6 +148,9 @@ None.
 | 009 | F-SAFETY-NET Phase 2 — 9 service test classes (brackets, freight, 4 characterizations)            | 2026-05-22 | (HEAD) | ✅ Done |
 | 010 | F-SAFETY-NET Phase 3 — MockMvc integration + JaCoCo report verified                                | 2026-05-22 | (HEAD) | ✅ Done |
 | 011 | F-UPGRADE — Java 21, Spring Boot 3.5.14, Spotless, Checkstyle, docs/spec updates                    | 2026-05-23 | (HEAD) | ✅ Done |
+| 012 | F-CLEAN — Clean Architecture layers, ports/adapters, DTO mapping, docs/spec updates                 | 2026-05-23 | (HEAD) | ✅ Done |
+| 013 | F-CLEAN follow-up — switch-based freight calculation, null-safe region lookup, async guidance       | 2026-05-23 | (HEAD) | ✅ Done |
+| 014 | F-DEFECTS-FUNCTIONAL — resolve C-1 through C-4 with stateless tax, 400 validation, BigDecimal money | 2026-05-23 | (HEAD) | ✅ Done |
 
 > Commits are pending — none of the above is in git yet beyond the initial commit `0780ce3`. To be staged when the user asks.
 
@@ -132,7 +164,7 @@ Ideas captured during work that belong in future features or phases. Prevents sc
 - [ ] Webhook receiver for the delivery system's async confirmation — **Captured during:** integrations doc. Belongs in F-RESILIENCE.
 - [ ] Rename `src/main/resources/paylods/` → `payloads/` — **Captured during:** rename work (C-7).
 - [ ] JaCoCo coverage gate in CI with per-layer thresholds (≥80 % domain/use-case, ≥60 % adapter) — **Captured during:** TESTING.md. Belongs in F-UPGRADE.
-- [ ] Add `@Validated` + Bean Validation annotations on the `Order` payload (e.g., `@Positive`, `@NotNull`) — **Captured during:** brownfield mapping. Belongs in F-CLEAN (validation is application-layer).
+- [ ] Add `@Validated` + Bean Validation annotations on the `Order` payload (e.g., `@Positive`, `@NotNull`) — **Captured during:** brownfield mapping. Belongs in a future validation hardening task; F-DEFECTS-FUNCTIONAL already covers C-2/C-3 domain policy.
 - [ ] Document an ADR comparing CDK vs Terraform if the user wants to revisit AD-005 — **Captured during:** AWS sizing question.
 
 ---
@@ -141,7 +173,7 @@ Ideas captured during work that belong in future features or phases. Prevents sc
 
 In-progress thoughts and action items that don't fit in active tasks.
 
-- [ ] Before F-DEFECTS-FUNCTIONAL starts, confirm with product (or document a defensible default) for: (a) JURIDICA + `taxRegime ∈ {OUTROS, null}` policy, (b) missing-delivery-region freight policy.
+- [x] F-DEFECTS-FUNCTIONAL policy chosen and implemented: reject `JURIDICA + OUTROS/null` and missing/null delivery region with typed HTTP 400 responses.
 - [ ] Decide F-AWS compute target (ECS Fargate vs Lambda) before writing Terraform modules. Default lean: ECS Fargate (predictable behavior, no cold starts, fits the synchronous critical path of `RegistrationService`).
 - [ ] Add `.gitignore` entries for `.specs/` if the user wants the spec-driven artifacts kept local (currently included; recommend keeping them committed for review).
 

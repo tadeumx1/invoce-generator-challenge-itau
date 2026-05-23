@@ -1,6 +1,6 @@
 # Invoice Generator — Business Rules
 
-This document captures the *intended* behavior of the invoice generator, frozen before the refactor work begins. It is the contract any refactor must preserve: identifiers move and bugs get fixed, but the math, the side-effect set, and the JSON payload shape stay the same.
+This document captures the intended behavior of the invoice generator after the safety-net, upgrade, Clean Architecture, and first functional-defect pass. Identifiers moved and C-1 through C-4 were fixed, but the JSON payload shape stays the same.
 
 The original codebase is in Portuguese. This document uses English for prose and identifiers, but keeps Brazilian-domain terms (CPF, CNPJ, Simples Nacional, Lucro Real, Lucro Presumido, and the five Brazilian regions) where they have no equivalent in English. A glossary follows at the end.
 
@@ -14,9 +14,10 @@ The original codebase is in Portuguese. This document uses English for prose and
 | ------ | ----------------------------- | ------------ | -------- |
 | POST   | `/api/orders/generate-invoice`| `Order` JSON | `Invoice` JSON |
 
-> *Note:* The legacy URL was `POST /api/pedido/gerarNotaFiscal`. The URL is not part of the locked payload contract, so it has been translated alongside the code. If external clients pin the old path, expose it as an alias.
+> *Compatibility:* The main URL is `POST /api/orders/generate-invoice`. The legacy URL
+> `POST /api/pedido/gerarNotaFiscal` remains available as an alias for existing clients.
 
-The controller delegates to `InvoiceGeneratorService.generateInvoice(Order)` and returns the resulting `Invoice` with HTTP 200.
+The controller maps the JSON DTO to a domain `Order`, delegates to `GenerateInvoiceUseCase.generateInvoice(order)`, and returns the resulting `Invoice` with HTTP 200. Domain validation failures are returned as HTTP 400 with `codigo` and `mensagem`.
 
 ---
 
@@ -89,7 +90,11 @@ The legacy code uses `<` for the lowest bracket and `<=` for the upper edge of t
 
 ### 3.6 `OUTROS` and missing regime
 
-The legacy implementation has no branch for `taxRegime = OUTROS` or `taxRegime = null` when `personType = JURIDICA`. In that case the invoice ends up with an **empty `items` list** (no tax computed). This is a known defect, listed in §6.
+`taxRegime = OUTROS` is not supported for invoice generation. A `JURIDICA` recipient with `taxRegime = OUTROS` is rejected with HTTP 400 and code `UNSUPPORTED_TAX_REGIME`.
+
+A `JURIDICA` recipient with `taxRegime = null` is also rejected with HTTP 400 and code `INVALID_TAX_REGIME`.
+
+The previous empty-`items` fallback was defect C-2 and is now fixed.
 
 ---
 
@@ -105,7 +110,22 @@ The base `freightValue` is multiplied by a region-specific factor. The `region` 
 | `SUDESTE`       | 1.048      |
 | `SUL`           | 1.060      |
 
-If no matching address exists, the legacy code produces `adjustedFreight = 0`. If a matching delivery address exists but its `region` is `null`, the legacy code throws `NullPointerException` from `Stream.findFirst()` (`findFirst` rejects null elements). Both are known defects, listed in §6.
+If no matching delivery address exists, or if the matching delivery address has `region = null`, the request is rejected with HTTP 400 and code `INVALID_DELIVERY_REGION`.
+
+Calculated freight is rounded to 2 decimal places with `RoundingMode.HALF_EVEN`. For example, `72 × 1.048 = 75.456` becomes `75.46`.
+
+---
+
+## 4.1 Money and rounding
+
+Domain and web DTO monetary fields use `BigDecimal`. JSON still uses numeric values; field names and enum values are unchanged.
+
+Calculated item tax and freight are rounded to scale 2 with `HALF_EVEN`:
+
+```
+itemTaxValue = round(unitPrice * taxRate, scale=2, HALF_EVEN)
+adjustedFreight = round(freightValue * regionMultiplier, scale=2, HALF_EVEN)
+```
 
 ---
 
@@ -122,15 +142,15 @@ The sleeps simulate slow external systems. They are part of the challenge premis
 
 ---
 
-## 6. Known defects (intentional — to be fixed during the refactor, not now)
+## 6. Defect status
 
-These are documented so a refactor can identify them as bugs rather than mistakenly preserving them as "rules":
+The first functional-defect pass resolved C-1 through C-4:
 
-1. **Cross-request accumulation.** `ProductTaxRateCalculator` (legacy `CalculadoraAliquotaProduto`) keeps a `static` list of `InvoiceItem`s, so each request's tax items are appended to the previous request's. The correct behavior: each request returns only its own items.
-2. **Stale tax-rate fallback.** When `personType = JURIDICA` with `taxRegime = OUTROS` (or null), no rate is applied and `items` is empty. The correct behavior should be specified by the business (likely: reject the request, or apply a defined default).
-3. **Missing-region freight (two distinct broken paths).** (a) When no delivery/billing address has a region, `adjustedFreight = 0`. (b) When a delivery address exists but its `region` is null, the request fails with `NullPointerException` from `Stream.findFirst()`. The correct behavior should be defined (likely: reject 400 in both cases, or pass through `freightValue` unchanged).
-4. **`double` for money.** All monetary fields are `double`. This is acceptable as input/output JSON, but tax math should move to `BigDecimal` with explicit rounding to avoid the inconsistencies external systems reported.
-5. **Synchronous + slow.** The four side effects run sequentially on the request thread; the +5s sleep on orders with more than 5 items makes the request budget unbounded.
+1. **Cross-request accumulation — resolved.** `LegacyProductTaxRateCalculator` is stateless; each request returns only its own items.
+2. **Stale tax-rate fallback — resolved.** `JURIDICA + OUTROS/null` now rejects with HTTP 400 instead of returning an invoice with empty `items`.
+3. **Missing-region freight — resolved.** missing delivery address and null delivery region now reject with HTTP 400 instead of producing freight `0`.
+4. **`double` for money — resolved.** monetary fields now use `BigDecimal`; calculated money rounds to scale 2 with `HALF_EVEN`.
+5. **Synchronous + slow — still open.** The four side effects run sequentially on the request thread; the +5s sleep on orders with more than 5 items makes the request budget unbounded. This is tracked as C-6 / F-DEFECTS-PERFORMANCE.
 
 ---
 

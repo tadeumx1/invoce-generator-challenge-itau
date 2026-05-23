@@ -1,114 +1,75 @@
 # Architecture
 
-**Pattern:** Layered Spring MVC monolith with a partial hexagonal hint (`port/out/` package exists but only one port lives there).
+**Pattern:** Single-module Spring Boot API organized as Clean Architecture: domain model/ports, application use case, inbound/outbound adapters.
 
 ## High-Level Structure
 
 ```
 HTTP request
-   │
-   ▼
-InvoiceController            (web/controller — Spring @RestController)
-   │
-   ▼
-InvoiceGeneratorService      (service — interface)
-InvoiceGeneratorServiceImpl  (service/impl — orchestrator; mixes all concerns)
-   │
-   ├──► ProductTaxRateCalculator   (service — per-item tax application; instantiated with `new`)
-   │
-   └──► Fire-and-return side-effect pipeline (sequential, blocking):
-            new StockService().sendInvoiceForStockDeduction(invoice)
-            new RegistrationService().registerInvoice(invoice)
-            new DeliveryService().scheduleDelivery(invoice)
-                 └──► new DeliveryIntegrationPort().createDeliverySchedule(invoice)
-            new FinanceService().sendInvoiceToAccountsReceivable(invoice)
+   |
+   v
+adapter/web/InvoiceController
+   |
+   v
+application/GenerateInvoiceUseCase
+application/GenerateInvoiceInteractor
+   |
+   +-- domain/service/TaxRateTable
+   +-- domain/port/TaxRateCalculator
+   +-- domain/port/FreightCalculator
+   +-- domain/port/StockPort
+   +-- domain/port/InvoiceRegistrationPort
+   +-- domain/port/DeliveryPort
+   +-- domain/port/AccountsReceivablePort
+        ^
+        |
+adapter/config/ApplicationBeanConfig wires concrete adapters
+adapter/integration/{stock,registration,delivery,finance}
 ```
 
-## Identified Patterns
+## Layer Rules
 
-### Spring MVC controller → service
+- `domain/` contains models, ports, and business-rule services. It has no Spring or Jackson imports.
+- `application/` contains use case contracts and interactors. It has no Spring or Jackson imports.
+- `adapter/` owns framework and transport concerns: Spring MVC, JSON DTOs, bean wiring, and simulated external integrations.
+- `InvoiceGeneratorApplication` is the Spring Boot entry point only.
 
-**Location:** `web/controller/InvoiceController.java`
-**Purpose:** HTTP entry point that delegates immediately to the service layer.
-**Implementation:** `@Autowired InvoiceGeneratorService`, single `@PostMapping("/generate-invoice")`.
-**Example:** `InvoiceController.java:18-27`.
+## Current Data Flow
 
-### Interface + Impl split
+1. Client `POST`s Portuguese snake_case JSON to `/api/orders/generate-invoice`.
+2. `adapter/web` deserializes into DTOs and maps DTOs to domain `Order`.
+3. `GenerateInvoiceInteractor.generateInvoice(order)` selects the tax rate via `TaxRateTable`.
+4. If tax-regime/person-type input is invalid, the domain throws `InvalidInvoiceOrderException` and the web adapter returns HTTP 400.
+5. It delegates per-item tax math to `TaxRateCalculator`.
+6. It computes freight via `FreightCalculator`; missing/null delivery region is rejected with the same typed exception.
+7. Calculated money is rounded via `Money.rounded` (`BigDecimal`, scale 2, `HALF_EVEN`).
+8. It builds the domain `Invoice`.
+9. It calls outbound ports synchronously in legacy order: stock, registration, delivery, finance.
+10. The controller maps the domain `Invoice` back to response DTOs, preserving the JSON contract.
 
-**Location:** `service/InvoiceGeneratorService.java` (interface), `service/impl/InvoiceGeneratorServiceImpl.java`.
-**Purpose:** Token gesture toward dependency-inversion; only one implementation exists today.
-**Implementation:** Service interface annotated `@Service` on the impl only.
-**Example:** `InvoiceGeneratorServiceImpl.java`.
+## Current Functional Policy
 
-### Lombok DTOs
-
-**Location:** `model/`.
-**Purpose:** Reduce boilerplate on data classes.
-**Implementation:** `@Getter @Setter @Builder @AllArgsConstructor @NoArgsConstructor` on every record-like class.
-**Example:** `Order.java`, `Invoice.java`, `Recipient.java`.
-
-### Snake_case JSON ↔ camelCase Java
-
-**Location:** All model classes.
-**Purpose:** Preserve the Portuguese snake_case JSON payload while keeping English camelCase Java fields.
-**Implementation:** `@JsonProperty` on every field.
-**Example:** `Order.java:18-32`.
-
-### Static-list "calculator" *(anti-pattern, kept verbatim)*
-
-**Location:** `service/ProductTaxRateCalculator.java`.
-**Purpose:** None intended — it's a bug.
-**Implementation:** `private static List<InvoiceItem> invoiceItemList = new ArrayList<>();` shared across all requests.
-**Example:** `ProductTaxRateCalculator.java:10`. See `CONCERNS.md` C-1.
-
-### "Port" without inversion *(half-implemented hexagonal)*
-
-**Location:** `port/out/DeliveryIntegrationPort.java`.
-**Purpose:** Signals architectural intent toward hexagonal, but the "port" is a concrete class with no interface and is instantiated with `new` from the service that uses it. Not yet a real port.
-
-## Data Flow
-
-### Invoice generation (the only flow)
-
-1. Client `POST`s an `Order` JSON.
-2. Jackson deserializes via `@JsonProperty` annotations.
-3. `InvoiceGeneratorServiceImpl.generateInvoice(order)`:
-   a. Branch on `recipient.personType` (FISICA or JURIDICA).
-   b. If JURIDICA, further branch on `taxRegime` (SIMPLES_NACIONAL / LUCRO_REAL / LUCRO_PRESUMIDO; `OUTROS` and `null` fall through → empty items list, bug).
-   c. Look up `taxRate` from a hard-coded bracket table based on `totalItemsValue`.
-   d. Call `ProductTaxRateCalculator.calculateTax(items, taxRate)` → returns `List<InvoiceItem>` (with bug: returns the static accumulated list, not per-request).
-   e. Find the first `Address` with `purpose IN (ENTREGA, COBRANCA_ENTREGA)` and read its `region`.
-   f. Multiply `freightValue` by region factor; if no matching address, `adjustedFreightValue = 0` (bug).
-   g. Build `Invoice` (UUID id, `LocalDateTime.now()`, items, adjusted freight, recipient).
-   h. Synchronously call the four downstream stubs in order (each sleeps; `DeliveryIntegrationPort` adds 5s if `items.size() > 5`).
-   i. Return the `Invoice` to the controller, which wraps it in `200 OK`.
-
-Full canonical rules: `docs/business-rules.md`.
+- C-1 is fixed: `LegacyProductTaxRateCalculator` is stateless per call.
+- C-2 is fixed: JURIDICA + `OUTROS`/null rejects with HTTP 400.
+- C-3 is fixed: missing/null delivery region rejects with HTTP 400.
+- C-4 is fixed: monetary fields use `BigDecimal`, with scale 2 `HALF_EVEN` rounding for calculated money.
+- Integrations still sleep synchronously, including delivery's +5s trap for invoices with more than 5 items (C-6).
 
 ## Code Organization
 
-**Approach:** Layer-based, single bounded context.
-
-**Structure (rooted at `br.com.itau.invoicegenerator`):**
-
 ```
-.                                       — InvoiceGeneratorApplication
-model/                                  — DTOs and enums (12 files)
-service/                                — domain service interface + tax calculator
-service/impl/                           — orchestrator + 4 side-effect stubs
-port/out/                               — 1 partial outbound port
-web/controller/                         — 1 REST controller
+src/main/java/br/com/itau/invoicegenerator/
+├── InvoiceGeneratorApplication.java
+├── adapter/
+│   ├── config/
+│   ├── integration/{delivery,finance,registration,stock}/
+│   └── web/
+│       └── dto/
+├── application/
+├── domain/
+│   ├── model/
+│   ├── port/
+│   └── service/
 ```
 
-**Module boundaries:** none — single Maven module, single Java package tree.
-
-## Open architectural directions
-
-The target Clean Architecture (per the user's request, captured as F-CLEAN in `ROADMAP.md`) will introduce:
-
-- A `domain/` layer with use cases (one per side effect + one for the invoice generation itself) and pure domain logic free of Spring.
-- An `application/` layer (or "use case" interactors) coordinating the domain via ports.
-- An `infrastructure/` (or `adapters/`) layer with Spring components: HTTP adapter, persistence adapter (if added), outbound integration adapters (stock/registration/delivery/finance/tax).
-- Inversion of all current `new SomeService()` calls into ports + adapter implementations.
-
-Until then, the codebase remains as documented above.
+Full canonical business rules: `docs/business-rules.md`.

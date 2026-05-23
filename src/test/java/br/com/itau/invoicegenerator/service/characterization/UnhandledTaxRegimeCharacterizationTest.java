@@ -1,54 +1,37 @@
 package br.com.itau.invoicegenerator.service.characterization;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import br.com.itau.invoicegenerator.model.CompanyTaxRegime;
-import br.com.itau.invoicegenerator.model.Invoice;
-import br.com.itau.invoicegenerator.model.Order;
-import br.com.itau.invoicegenerator.service.ProductTaxRateCalculator;
-import br.com.itau.invoicegenerator.service.impl.InvoiceGeneratorServiceImpl;
+import br.com.itau.invoicegenerator.application.GenerateInvoiceUseCase;
+import br.com.itau.invoicegenerator.domain.exception.InvalidInvoiceOrderException;
+import br.com.itau.invoicegenerator.domain.model.CompanyTaxRegime;
+import br.com.itau.invoicegenerator.domain.model.Order;
 import br.com.itau.invoicegenerator.testsupport.Orders;
+import br.com.itau.invoicegenerator.testsupport.RecordingTaxRateCalculator;
+import br.com.itau.invoicegenerator.testsupport.TestUseCases;
 import org.junit.jupiter.api.Test;
 
 /**
- * SAFETY-21, SAFETY-22 — characterization of defect C-2 (JURIDICA + taxRegime ∈ {OUTROS, null}
- * silently produces empty items). See docs/business-rules.md §6.2 and .specs/codebase/CONCERNS.md
- * C-2.
- *
- * <p>M2 will replace these assertions with the agreed behavior (likely reject the request, or apply
- * a documented default). Decision pending.
+ * C-2 regression tests: unsupported or missing tax regime for JURIDICA must be rejected instead of
+ * generating an inconsistent invoice with empty items.
  */
 class UnhandledTaxRegimeCharacterizationTest {
 
   @Test
-  void juridicaWithOutrosTaxRegimeProducesEmptyItems_C2() {
-    ProductTaxRateCalculator calculator = mock(ProductTaxRateCalculator.class);
-    InvoiceGeneratorServiceImpl service = new InvoiceGeneratorServiceImpl(calculator);
+  void juridicaWithOutrosTaxRegimeIsRejected_C2Fixed() {
+    RecordingTaxRateCalculator calculator = new RecordingTaxRateCalculator();
+    GenerateInvoiceUseCase service = TestUseCases.generateInvoiceUseCase(calculator);
     Order order = Orders.juridica(1000.0, CompanyTaxRegime.OUTROS);
 
-    Invoice invoice = service.generateInvoice(order);
-
-    assertEquals(
-        0,
-        invoice.getItems().size(),
-        "C-2: OUTROS falls through; items end up empty (M2 fixes this)");
-    verifyNoInteractions(calculator);
+    assertThrows(InvalidInvoiceOrderException.class, () -> service.generateInvoice(order));
   }
 
   @Test
-  void juridicaWithNullTaxRegimeProducesEmptyItems_C2() {
-    ProductTaxRateCalculator calculator = mock(ProductTaxRateCalculator.class);
-    InvoiceGeneratorServiceImpl service = new InvoiceGeneratorServiceImpl(calculator);
+  void juridicaWithNullTaxRegimeIsRejected_C2Fixed() {
+    RecordingTaxRateCalculator calculator = new RecordingTaxRateCalculator();
+    GenerateInvoiceUseCase service = TestUseCases.generateInvoiceUseCase(calculator);
     Order order = Orders.juridica(1000.0, null);
 
-    Invoice invoice = service.generateInvoice(order);
-
-    assertEquals(
-        0,
-        invoice.getItems().size(),
-        "C-2: null taxRegime falls through; items end up empty (M2 fixes this)");
-    verifyNoInteractions(calculator);
+    assertThrows(InvalidInvoiceOrderException.class, () -> service.generateInvoice(order));
   }
 }

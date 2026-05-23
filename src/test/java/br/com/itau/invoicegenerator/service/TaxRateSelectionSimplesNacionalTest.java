@@ -1,19 +1,17 @@
 package br.com.itau.invoicegenerator.service;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static br.com.itau.invoicegenerator.testsupport.MoneyAssertions.assertBigDecimalEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
-import br.com.itau.invoicegenerator.model.CompanyTaxRegime;
-import br.com.itau.invoicegenerator.model.Invoice;
-import br.com.itau.invoicegenerator.model.Order;
-import br.com.itau.invoicegenerator.service.impl.InvoiceGeneratorServiceImpl;
+import br.com.itau.invoicegenerator.application.GenerateInvoiceUseCase;
+import br.com.itau.invoicegenerator.domain.model.CompanyTaxRegime;
+import br.com.itau.invoicegenerator.domain.model.Invoice;
+import br.com.itau.invoicegenerator.domain.model.Order;
 import br.com.itau.invoicegenerator.testsupport.Orders;
-import java.util.List;
+import br.com.itau.invoicegenerator.testsupport.RecordingTaxRateCalculator;
+import br.com.itau.invoicegenerator.testsupport.TestUseCases;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.Mockito;
 
 /** SAFETY-06..09 — JURIDICA × SIMPLES_NACIONAL tax-rate brackets. */
 class TaxRateSelectionSimplesNacionalTest {
@@ -34,14 +32,14 @@ class TaxRateSelectionSimplesNacionalTest {
     "10000.0, 0.19"
   })
   void selectsCorrectRateForSimplesNacional(double totalItemsValue, double expectedRate) {
-    ProductTaxRateCalculator calculator = mock(ProductTaxRateCalculator.class);
-    when(calculator.calculateTax(any(), Mockito.anyDouble())).thenReturn(List.of());
+    RecordingTaxRateCalculator calculator = new RecordingTaxRateCalculator();
 
     Order order = Orders.juridica(totalItemsValue, CompanyTaxRegime.SIMPLES_NACIONAL);
-    InvoiceGeneratorServiceImpl service = new InvoiceGeneratorServiceImpl(calculator);
+    GenerateInvoiceUseCase service = TestUseCases.generateInvoiceUseCase(calculator);
 
     Invoice ignored = service.generateInvoice(order);
 
-    verify(calculator).calculateTax(order.getItems(), expectedRate);
+    assertSame(order.getItems(), calculator.lastItems());
+    assertBigDecimalEquals(expectedRate, calculator.lastRate());
   }
 }

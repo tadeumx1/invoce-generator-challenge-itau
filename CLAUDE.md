@@ -2,38 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project context
+## Project Context
 
-This is the **Desafio Nota Fiscal** — a Brazilian "nota fiscal" (invoice) generator delivered as a coding challenge. The codebase ships with **intentional defects** (state bugs, performance traps, broken tests, mixed responsibilities) that are the work to be done. Treat existing bad patterns as the problem statement, not a style to follow.
+This is the **Desafio Nota Fiscal** — a Brazilian invoice generator coding challenge. The codebase intentionally contains defects that are being addressed through spec-driven tasks: safety net, Java/Spring upgrade, Clean Architecture, functional fixes, resilience/observability, and AWS architecture.
 
-Read `README.md` (in Portuguese — it's the challenge brief) and `docs/business-rules.md` (in English — the frozen behavior contract) before making non-trivial changes.
+Read `README.md` and `docs/business-rules.md` before changing behavior. `docs/business-rules.md` is the frozen contract for tax brackets, freight, side effects, and known defects.
 
-### Hard constraints from the challenge brief
+## Hard Constraints
 
-- **Do not modify the input/output JSON payload.** JSON keys remain snake_case Portuguese (`id_pedido`, `valor_total_itens`, `tipo_pessoa`, …) and JSON enum values remain Portuguese (`FISICA`, `SIMPLES_NACIONAL`, `SUDESTE`, `ENTREGA`, …). Java-side names have been translated to English; the contract is preserved via `@JsonProperty`. Sample payloads: `src/main/resources/paylods/teste-pf.json` and `teste-pj-simples.json`.
-- **Do not simply delete `Thread.sleep` calls.** They simulate slow external integrations (stock, registration, delivery, finance). The challenge is to handle them properly — async, parallelism, timeouts, resilience — not erase them. In particular, `DeliveryIntegrationPort` has a 5-second sleep when `items.size() > 5`; the comment there explicitly says this represents a real upstream constraint.
+- **Do not modify the input/output JSON payload.** JSON keys remain snake_case Portuguese (`id_pedido`, `valor_total_itens`, `tipo_pessoa`, ...), and enum values remain Portuguese (`FISICA`, `SIMPLES_NACIONAL`, `SUDESTE`, `ENTREGA`, ...). The JSON contract is isolated in `adapter/web/dto`.
+- **Do not simply delete `Thread.sleep` calls.** They simulate slow external integrations. Future work should handle them with async processing, queues, timeouts, retries, and resilience.
 - The active stack is **Java 21 + Spring Boot 3.5.14**. Use the default JDK 21 shell; no `JAVA_HOME` override is required.
 
 ## Commands
 
-Build / test (Maven wrapper is committed; use it, not a system `mvn`):
-
 ```bash
 ./mvnw clean package          # full build + tests
-./mvnw test                   # tests only
+./mvnw test                   # fast tests only
 ./mvnw verify                 # tests + Spotless + Checkstyle + JaCoCo
-./mvnw spring-boot:run        # run the app (default port 8080)
+./mvnw spring-boot:run        # run the app on port 8080
 
-# Run a single test class or method
-./mvnw test -Dtest=InvoiceGeneratorServiceImplTest
+./mvnw test -Dtest=GenerateInvoiceInteractorTest
 ./mvnw test -Dtest=TaxRateSelectionFisicaTest
 
-# Slow characterization tests are excluded by default. Run them via the slow profile:
-./mvnw test -Pslow
-
-# Formatting/style
-./mvnw spotless:apply         # format Java sources with google-java-format
-./mvnw verify                 # also runs Spotless check + Checkstyle
+./mvnw test -Pslow            # slow characterization tests
+./mvnw spotless:apply         # format Java sources
 ```
 
 Exercising the API locally:
@@ -44,45 +37,55 @@ curl -X POST http://localhost:8080/api/orders/generate-invoice \
   -d @src/main/resources/paylods/teste-pf.json
 ```
 
-(Note the directory is misspelled `paylods/`, not `payloads/` — keep this in mind when referencing the sample files.)
+The sample directory is intentionally misspelled `paylods/`; keep references consistent until C-7 is handled.
 
 ## Architecture
 
-Single Spring Boot module, package root `br.com.itau.invoicegenerator`. One HTTP entry point, one orchestrating service, several downstream "integration" stubs.
+Single Spring Boot module, package root `br.com.itau.invoicegenerator`, organized as Clean Architecture.
 
 ```
-web/controller/InvoiceController          POST /api/orders/generate-invoice
-        │
-        ▼
-service/InvoiceGeneratorService  (interface)
-service/impl/InvoiceGeneratorServiceImpl  ← orchestrator; contains all branching
-        │
-        ├─ service/ProductTaxRateCalculator     tax-rate application per item
-        │
-        └─ after building Invoice, calls in sequence:
-              StockService          (sleep 380ms)
-              RegistrationService   (sleep 500ms)
-              DeliveryService → port/out/DeliveryIntegrationPort  (sleep 150 + 200ms; +5s if items > 5)
-              FinanceService        (sleep 250ms)
+adapter/web/InvoiceController
+        |
+        v
+application/GenerateInvoiceUseCase
+application/GenerateInvoiceInteractor
+        |
+        +-- domain/service/TaxRateTable
+        +-- domain/port/TaxRateCalculator
+        +-- domain/port/FreightCalculator
+        +-- domain/port/StockPort
+        +-- domain/port/InvoiceRegistrationPort
+        +-- domain/port/DeliveryPort
+        +-- domain/port/AccountsReceivablePort
+              ^
+              |
+adapter/integration/* implementations
 ```
 
-For the exact tax brackets, freight multipliers, side-effect ordering, and known defects, see **`docs/business-rules.md`** — it is the canonical reference and should be updated whenever behavior changes.
+Layer rules:
 
-### Key shapes to know about the current (broken) implementation
+- `domain/` and `application/` must not import Spring or Jackson.
+- JSON DTOs and `@JsonProperty` live in `adapter/web/dto`.
+- Spring bean composition lives in `adapter/config/ApplicationBeanConfig`.
+- Simulated downstream systems live under `adapter/integration/{stock,registration,delivery,finance}`.
 
-The orchestrator and its collaborators carry the bugs the challenge asks you to fix. Be aware of them so changes don't preserve the defect:
+## Defect Status
 
-- **`ProductTaxRateCalculator.invoiceItemList` is `static`**: items accumulate across requests. This is the "primeira execução funciona, seguintes acumulam" bug from the README. Any refactor must make per-request state truly per-request.
-- **Downstream services are instantiated with `new` inside the orchestrator** (`new StockService()`, `new RegistrationService()`, …) rather than injected. They are not Spring beans. Converting them to beans (and likely running them async/parallel) is part of the cleanup.
-- **`InvoiceGeneratorServiceImpl` is one giant `if/else` tree** mixing person-type branching, tax-regime branching, freight-region branching, and side-effect orchestration. Splitting these responsibilities (strategy per `PersonType` / `CompanyTaxRegime`, freight calculator per `Region`, etc.) is expected.
-- **Freight uses `double` and falls through to `0.0` when `Region` is null** (no ENTREGA/COBRANCA_ENTREGA address found) — this is a likely source of the "inconsistências nos valores" the README mentions. Money math should also probably move off `double` and onto `BigDecimal`.
-- **The existing tests in `InvoiceGeneratorServiceImplTest` are misleading**: they declare `@Mock ProductTaxRateCalculator` and `@InjectMocks InvoiceGeneratorServiceImpl`, but the SUT does `new ProductTaxRateCalculator()` internally, so the mock is never used. Tests pass today only because they exercise the real calculator. Don't trust them as a safety net.
-- **`JURIDICA` + `taxRegime = OUTROS`/null** falls through every branch and produces an invoice with an empty `items` list — see business-rules §3.6 and §6.2.
+F-DEFECTS-FUNCTIONAL resolved the first correctness batch:
 
-### Domain model
+- `LegacyProductTaxRateCalculator` is stateless per call (C-1 fixed).
+- JURIDICA + `taxRegime = OUTROS`/null rejects with HTTP 400 (C-2 fixed).
+- Missing delivery address or delivery address with `region=null` rejects with HTTP 400 (C-3 fixed).
+- Money uses `BigDecimal`; calculated tax/freight round to scale 2 with `HALF_EVEN` (C-4 fixed).
+- There is no fire-and-forget implementation today. The use case calls stock, registration, delivery, and finance ports synchronously. For production async work, prefer durable queue/outbox over detached threads or untracked `CompletableFuture.runAsync`.
+- Delivery still adds 5 seconds when invoice item count is greater than 5 (C-6 still open; next feature is F-DEFECTS-PERFORMANCE).
 
-`model/` contains plain Lombok DTOs (`Order`, `Recipient`, `Address`, `Item`, `Invoice`, `InvoiceItem`, `Document`) and enums driving the branching logic: `PersonType` (FISICA/JURIDICA), `CompanyTaxRegime` (SIMPLES_NACIONAL/LUCRO_REAL/LUCRO_PRESUMIDO/OUTROS), `Region` (NORTE/NORDESTE/CENTRO_OESTE/SUDESTE/SUL), `AddressPurpose`, `DocumentType`. Enum *values* stay in Portuguese because they're part of the JSON payload contract; the enclosing class names are English. See `docs/business-rules.md` §7 for the glossary.
+## Testing Notes
 
-JSON ↔ Java mapping uses `@JsonProperty` with snake_case Portuguese keys; Java fields are camelCase English.
+The main safety net is 56 fast tests plus the slow profile on demand:
 
-The `port/out/` package hints at a hexagonal-architecture direction — only `DeliveryIntegrationPort` exists today, but new external integrations should follow that pattern rather than being inlined into services.
+- `./mvnw test`: fast suite, excludes `@Tag("slow")`.
+- `./mvnw test -Pslow`: slow delivery characterization.
+- `./mvnw verify`: full pre-commit gate.
+
+No current tests use Mockito; it is excluded from the test starter to keep Spring tests runnable in restricted JVM environments.

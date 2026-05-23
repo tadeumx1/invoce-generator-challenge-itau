@@ -2,28 +2,23 @@ package br.com.itau.invoicegenerator.service.characterization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import br.com.itau.invoicegenerator.model.Invoice;
-import br.com.itau.invoicegenerator.model.Order;
-import br.com.itau.invoicegenerator.service.ProductTaxRateCalculator;
-import br.com.itau.invoicegenerator.service.impl.InvoiceGeneratorServiceImpl;
+import br.com.itau.invoicegenerator.application.GenerateInvoiceUseCase;
+import br.com.itau.invoicegenerator.domain.model.Invoice;
+import br.com.itau.invoicegenerator.domain.model.Order;
+import br.com.itau.invoicegenerator.domain.service.LegacyProductTaxRateCalculator;
 import br.com.itau.invoicegenerator.testsupport.Orders;
+import br.com.itau.invoicegenerator.testsupport.TestUseCases;
 import org.junit.jupiter.api.Test;
 
-/**
- * SAFETY-20 — characterization of defect C-1 (cross-call item accumulation through the service).
- * See docs/business-rules.md §6.1 and .specs/codebase/CONCERNS.md C-1.
- *
- * <p>M2 will flip the second assertion to expect {@code items.size() == 1} after the calculator is
- * made per-request stateless.
- */
+/** C-1 regression test: invoice items must not leak between calls on the same service instance. */
 class StaticListAccumulationCharacterizationTest {
 
   @Test
-  void twoCallsOnSameServiceInstanceLeakItems_C1() {
+  void twoCallsOnSameServiceInstanceDoNotLeakItems_C1Fixed() {
     // Instantiate manually so we observe the bug deterministically without depending on the
     // Spring singleton being shared between this test and others.
-    ProductTaxRateCalculator calculator = new ProductTaxRateCalculator();
-    InvoiceGeneratorServiceImpl service = new InvoiceGeneratorServiceImpl(calculator);
+    LegacyProductTaxRateCalculator calculator = new LegacyProductTaxRateCalculator();
+    GenerateInvoiceUseCase service = TestUseCases.generateInvoiceUseCase(calculator);
 
     Order first = Orders.fisica(400);
     Order second = Orders.fisica(400);
@@ -31,14 +26,13 @@ class StaticListAccumulationCharacterizationTest {
     Invoice firstInvoice = service.generateInvoice(first);
     Invoice secondInvoice = service.generateInvoice(second);
 
-    // Both invoices reference the same shared, growing list.
     assertEquals(
-        2,
+        1,
         secondInvoice.getItems().size(),
-        "C-1: second invoice contains items from both calls (M2 flips to == 1)");
+        "C-1 fixed: second invoice contains only the second call's items");
     assertEquals(
-        2,
+        1,
         firstInvoice.getItems().size(),
-        "C-1: the first invoice's items reference also points at the leaked list");
+        "C-1 fixed: first invoice's items remain isolated after the second call");
   }
 }

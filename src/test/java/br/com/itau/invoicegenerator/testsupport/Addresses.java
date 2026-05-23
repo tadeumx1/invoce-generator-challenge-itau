@@ -1,8 +1,8 @@
 package br.com.itau.invoicegenerator.testsupport;
 
-import br.com.itau.invoicegenerator.model.Address;
-import br.com.itau.invoicegenerator.model.AddressPurpose;
-import br.com.itau.invoicegenerator.model.Region;
+import br.com.itau.invoicegenerator.domain.model.Address;
+import br.com.itau.invoicegenerator.domain.model.AddressPurpose;
+import br.com.itau.invoicegenerator.domain.model.Region;
 
 public final class Addresses {
 
