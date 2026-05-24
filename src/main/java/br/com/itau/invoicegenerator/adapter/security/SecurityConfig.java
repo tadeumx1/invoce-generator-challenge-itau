@@ -96,7 +96,11 @@ public class SecurityConfig {
                     .hasAuthority("SCOPE_invoice:write")
                     .anyRequest()
                     .authenticated())
-        .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(jwtDecoder)))
+        .oauth2ResourceServer(
+            o ->
+                o.jwt(j -> j.decoder(jwtDecoder))
+                    .authenticationEntryPoint(authenticationEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler))
         .build();
   }
 }
