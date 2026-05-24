@@ -32,7 +32,7 @@ F-UPGRADE's job is a platform/tooling migration only: update Java/Spring/Maven b
 | Resilience, async processing, observability, or AWS deployment | Later roadmap milestones. |
 | Enforcing JaCoCo minimum coverage thresholds | Deferred; F-UPGRADE keeps JaCoCo report generation but does not fail builds on coverage percentage. |
 | Broad style rewrites beyond mechanical formatting/import policy | Avoid mixing toolchain upgrade with unrelated refactors. |
-| Renaming `paylods/` to `payloads/` | Cosmetic and deferred as C-7. Existing docs and tests rely on the current path. |
+| Renaming `payloads/` to `payloads/` | Cosmetic and deferred as C-7. Existing docs and tests rely on the current path. |
 | Changing JSON payload keys or enum values | Explicit challenge constraint; payload contract remains frozen. |
 
 ---
@@ -93,7 +93,7 @@ grep -R "javax\\." -n src/main/java src/test/java
 
 9. **WHEN** the fast safety-net suite runs **THEN** all F-SAFETY-NET tests SHALL remain green.
 10. **WHEN** the slow characterization profile runs **THEN** the >5-items delivery delay characterization SHALL remain green.
-11. **WHEN** `InvoiceControllerIntegrationTest` runs **THEN** the endpoint SHALL still accept the two `paylods/` fixtures and return Portuguese snake_case JSON.
+11. **WHEN** `InvoiceControllerIntegrationTest` runs **THEN** the endpoint SHALL still accept the two `payloads/` fixtures and return Portuguese snake_case JSON.
 12. **WHEN** known defect characterizations run **THEN** C-1, C-2, C-3, and C-6 SHALL still be characterized as before.
 
 **Independent Test**:

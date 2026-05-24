@@ -34,10 +34,10 @@ Exercising the API locally:
 ```bash
 curl -X POST http://localhost:8080/api/orders/generate-invoice \
   -H 'Content-Type: application/json' \
-  -d @src/main/resources/paylods/teste-pf.json
+  -d @src/main/resources/payloads/teste-pf.json
 ```
 
-The sample directory is intentionally misspelled `paylods/`; keep references consistent until C-7 is handled.
+C-7 closed (2026-05-23): the sample directory is now `payloads/` (was `paylods/`); every doc, test, and spec reference has been updated.
 
 ## Architecture
 

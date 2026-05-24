@@ -33,7 +33,7 @@ The chosen policy for invalid fiscal/freight input is to reject the request with
 | Async side effects / outbox | Belongs in F-DEFECTS-PERFORMANCE and F-RESILIENCE. |
 | Timeouts, retries, circuit breakers | Belongs in F-RESILIENCE. |
 | Changing item tax to multiply by quantity | The legacy/documented rule ignores quantity; changing it would be a separate business decision. |
-| Renaming `paylods/` to `payloads/` | Cosmetic C-7, deferred. |
+| Renaming `payloads/` to `payloads/` | Cosmetic C-7, deferred. |
 | Full Bean Validation annotations | Useful, but this feature only addresses the documented C-1 to C-4 defects. |
 
 ---

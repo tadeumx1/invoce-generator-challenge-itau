@@ -68,11 +68,11 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 
 ---
 
-## C-7 — Misspelled resource directory `paylods/` 🟡 low (cosmetic)
+## C-7 — Misspelled resource directory `paylods/` ✅ resolved (2026-05-23)
 
-**Evidence:** `src/main/resources/paylods/teste-pf.json`, `teste-pj-simples.json`.
-**Impact:** Confusion when looking for sample payloads; misleading file path in docs.
-**Fix:** Rename to `payloads/`. Trivial. Track as a deferred idea or sweep along with F-UPGRADE.
+**Previous evidence:** `src/main/resources/paylods/teste-pf.json`, `teste-pj-simples.json`.
+**Previous impact:** Confusion when looking for sample payloads; misleading file path in docs.
+**Resolution (2026-05-23):** directory renamed `paylods/` → `payloads/`. Every doc, spec, test fixture loader, Postman collection, and CI workflow reference swept in the same commit. `./mvnw test` green; no remaining `paylods` substring anywhere in the repo.
 
 ---
 

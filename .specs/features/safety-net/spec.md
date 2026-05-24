@@ -10,7 +10,7 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 
 - [ ] Test coverage for every documented business rule in `docs/business-rules.md` §3 (tax) and §4 (freight), including bracket-edge cases.
 - [ ] Characterization tests pinning the current behavior of every defect in `docs/business-rules.md` §6 (C-1 to C-4), so M2 has explicit red→green flips with no surprises.
-- [ ] End-to-end coverage of `POST /api/orders/generate-invoice` exercised through `MockMvc` with the two `paylods/` fixtures.
+- [ ] End-to-end coverage of `POST /api/orders/generate-invoice` exercised through `MockMvc` with the two `payloads/` fixtures.
 - [ ] Zero order-dependent tests. Running `./mvnw test` repeatedly produces identical results.
 - [ ] Calculator made constructor-injectable so the existing misleading `@Mock` becomes either correct (mock actually used) or removed.
 - [ ] JaCoCo wired and producing a report on `./mvnw verify` (measurement only — no gate enforcement yet; gate lives in F-UPGRADE).
@@ -103,8 +103,8 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 
 **Acceptance Criteria**:
 
-24. **WHEN** `POST /api/orders/generate-invoice` is called with the body of `src/main/resources/paylods/teste-pf.json` **THEN** the system SHALL respond with HTTP 200, `Content-Type: application/json`, and a body containing the keys `id_nota_fiscal`, `data`, `valor_total_itens=100.0`, `valor_frete=10.48` (10 × 1.048 for SUDESTE), `itens[0].valor_tributo_item=0.0` (FISICA < 500 → 0% rate), and `destinatario.tipo_pessoa="FISICA"`.
-25. **WHEN** `POST /api/orders/generate-invoice` is called with the body of `src/main/resources/paylods/teste-pj-simples.json` **THEN** the system SHALL respond with HTTP 200 and a body containing `valor_frete=75.456` (72 × 1.048 SUDESTE), `itens[0].valor_tributo_item=138.7` (730 × 0.19, since `totalItemsValue=5840 > 5000` → SIMPLES_NACIONAL rate 0.19), and `destinatario.tipo_pessoa="JURIDICA"`. F-DEFECTS-FUNCTIONAL later changes this expected freight to `75.46` because calculated money is rounded to scale 2.
+24. **WHEN** `POST /api/orders/generate-invoice` is called with the body of `src/main/resources/payloads/teste-pf.json` **THEN** the system SHALL respond with HTTP 200, `Content-Type: application/json`, and a body containing the keys `id_nota_fiscal`, `data`, `valor_total_itens=100.0`, `valor_frete=10.48` (10 × 1.048 for SUDESTE), `itens[0].valor_tributo_item=0.0` (FISICA < 500 → 0% rate), and `destinatario.tipo_pessoa="FISICA"`.
+25. **WHEN** `POST /api/orders/generate-invoice` is called with the body of `src/main/resources/payloads/teste-pj-simples.json` **THEN** the system SHALL respond with HTTP 200 and a body containing `valor_frete=75.456` (72 × 1.048 SUDESTE), `itens[0].valor_tributo_item=138.7` (730 × 0.19, since `totalItemsValue=5840 > 5000` → SIMPLES_NACIONAL rate 0.19), and `destinatario.tipo_pessoa="JURIDICA"`. F-DEFECTS-FUNCTIONAL later changes this expected freight to `75.46` because calculated money is rounded to scale 2.
 26. **WHEN** the request body uses snake_case Portuguese keys **THEN** the response body SHALL also use snake_case Portuguese keys — no English keys SHALL appear in the JSON.
 
 **Independent Test**: Run `./mvnw test -Dtest=InvoiceControllerIntegrationTest` (new). Test uses `MockMvc` against the real Spring context.
@@ -216,5 +216,5 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 - [ ] The four documented defects (C-1, C-2, C-3, C-6) each have at least one explicit characterization test referenced by ID in the test source.
 - [ ] `./mvnw verify` produces a JaCoCo HTML report.
 - [ ] `InvoiceGeneratorServiceImpl` accepts its calculator dependency via the constructor and Spring wires it.
-- [ ] A `MockMvc`-based integration test posts each of the two `paylods/` fixtures and asserts the response JSON shape and key values.
+- [ ] A `MockMvc`-based integration test posts each of the two `payloads/` fixtures and asserts the response JSON shape and key values.
 - [ ] After this feature lands, the M2 work of fixing C-1/C-2/C-3 consists of flipping characterization tests' assertions (and pointing to this spec) rather than discovering behavior anew.

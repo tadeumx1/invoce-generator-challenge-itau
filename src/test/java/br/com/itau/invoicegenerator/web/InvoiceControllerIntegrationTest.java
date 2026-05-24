@@ -26,7 +26,7 @@ import org.springframework.util.StreamUtils;
 
 /**
  * SAFETY-24, SAFETY-25, SAFETY-26 — end-to-end HTTP integration against the two sample payloads
- * shipped in src/main/resources/paylods/. Proves the JSON contract (snake_case Portuguese keys) is
+ * shipped in src/main/resources/payloads/. Proves the JSON contract (snake_case Portuguese keys) is
  * intact through the whole stack.
  *
  * <p>Uses {@code @DirtiesContext(BEFORE_EACH_TEST_METHOD)} to keep each HTTP test isolated from the
@@ -47,7 +47,7 @@ class InvoiceControllerIntegrationTest {
 
   @Test
   void respondsForTestePfPayloadWithExpectedContract() throws Exception {
-    String body = loadFixture("paylods/teste-pf.json");
+    String body = loadFixture("payloads/teste-pf.json");
 
     MvcResult result =
         mockMvc
@@ -73,7 +73,7 @@ class InvoiceControllerIntegrationTest {
 
   @Test
   void respondsForTestePjSimplesPayloadWithExpectedContract() throws Exception {
-    String body = loadFixture("paylods/teste-pj-simples.json");
+    String body = loadFixture("payloads/teste-pj-simples.json");
 
     MvcResult result =
         mockMvc
@@ -97,7 +97,7 @@ class InvoiceControllerIntegrationTest {
 
   @Test
   void keepsPortugueseEndpointAsLegacyCompatibilityAlias() throws Exception {
-    String body = loadFixture("paylods/teste-pf.json");
+    String body = loadFixture("payloads/teste-pf.json");
 
     mockMvc
         .perform(
@@ -112,7 +112,7 @@ class InvoiceControllerIntegrationTest {
 
   @Test
   void rejectsJuridicaOutrosTaxRegimeWithBadRequest() throws Exception {
-    String body = loadFixture("paylods/teste-pj-simples.json");
+    String body = loadFixture("payloads/teste-pj-simples.json");
     body =
         body.replace(
             "\"regime_tributacao\": \"SIMPLES_NACIONAL\"", "\"regime_tributacao\": \"OUTROS\"");
@@ -128,7 +128,7 @@ class InvoiceControllerIntegrationTest {
 
   @Test
   void rejectsMissingDeliveryRegionWithBadRequest() throws Exception {
-    String body = loadFixture("paylods/teste-pf.json");
+    String body = loadFixture("payloads/teste-pf.json");
     body = body.replace("\"regiao\": \"SUDESTE\"", "\"regiao\": null");
 
     mockMvc

@@ -69,7 +69,7 @@ class HttpTracePropagationIntegrationTest {
 
   @Test
   void requestEchoesCorrelationIdAndOpensInvoiceGenerateObservation() throws Exception {
-    String body = loadFixture("paylods/teste-pf.json");
+    String body = loadFixture("payloads/teste-pf.json");
 
     mockMvc
         .perform(

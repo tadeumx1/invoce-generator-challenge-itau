@@ -61,7 +61,7 @@ class InvoiceKafkaFlowIntegrationTest {
 
   @Test
   void postPublishesFourEventsAndConsumersReceiveThem() throws Exception {
-    String body = loadFixture("paylods/teste-pf.json");
+    String body = loadFixture("payloads/teste-pf.json");
 
     long startMs = System.currentTimeMillis();
     mockMvc

@@ -238,7 +238,7 @@ grep -R "org.springframework\|com.fasterxml.jackson" -n src/main/java/br/com/ita
 - [x] Domain models contain no Jackson imports.
 - [x] Web DTOs preserve all request/response field names.
 - [x] Nested DTO/domain mapping covers order, recipient, documents, addresses, items, invoice, and invoice items.
-- [x] HTTP integration tests still pass with the two `paylods/` fixtures.
+- [x] HTTP integration tests still pass with the two `payloads/` fixtures.
 
 **Tests:** HTTP integration.
 **Gate:**

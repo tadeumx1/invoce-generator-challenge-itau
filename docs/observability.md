@@ -186,7 +186,7 @@ docker compose up --build -d
 for i in {1..30}; do
   curl -s -o /dev/null -X POST http://localhost:8080/api/orders/generate-invoice \
     -H 'Content-Type: application/json' \
-    -d @src/main/resources/paylods/teste-pf.json
+    -d @src/main/resources/payloads/teste-pf.json
 done
 
 # SLI-1 source

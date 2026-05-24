@@ -223,4 +223,4 @@ jobs:
           curl -fsS --retry 5 --retry-delay 6 --retry-connrefused \
             -X POST "$API/api/orders/generate-invoice" \
             -H 'Content-Type: application/json' \
-            -d @src/main/resources/paylods/teste-pf.json
+            -d @src/main/resources/payloads/teste-pf.json

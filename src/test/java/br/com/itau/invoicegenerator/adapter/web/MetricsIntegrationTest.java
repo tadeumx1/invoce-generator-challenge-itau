@@ -40,7 +40,7 @@ class MetricsIntegrationTest {
 
   @Test
   void successfulPostIncrementsInvoiceGeneratedCounter() throws Exception {
-    String body = loadFixture("paylods/teste-pf.json");
+    String body = loadFixture("payloads/teste-pf.json");
 
     mockMvc
         .perform(
@@ -63,7 +63,7 @@ class MetricsIntegrationTest {
   @Test
   void rejectedPostIncrementsInvoiceRejectedCounter() throws Exception {
     String body =
-        loadFixture("paylods/teste-pj-simples.json")
+        loadFixture("payloads/teste-pj-simples.json")
             .replace(
                 "\"regime_tributacao\": \"SIMPLES_NACIONAL\"", "\"regime_tributacao\": \"OUTROS\"");
 
@@ -88,7 +88,7 @@ class MetricsIntegrationTest {
 
   @Test
   void httpServerRequestsHistogramExposesSloBuckets() throws Exception {
-    String body = loadFixture("paylods/teste-pf.json");
+    String body = loadFixture("payloads/teste-pf.json");
 
     mockMvc
         .perform(

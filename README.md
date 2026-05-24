@@ -72,10 +72,10 @@ test, enforces Spotless + Checkstyle, and emits the JaCoCo report at
 sleep 8
 curl -X POST http://localhost:8080/api/orders/generate-invoice \
   -H 'Content-Type: application/json' \
-  -d @src/main/resources/paylods/teste-pf.json
+  -d @src/main/resources/payloads/teste-pf.json
 ```
 
-> The `paylods/` directory is intentionally misspelled (C-7, deferred). Keep the path
+> The `payloads/` directory is intentionally misspelled (C-7, deferred). Keep the path
 > as is until C-7 is swept.
 
 The legacy URL `POST /api/pedido/gerarNotaFiscal` is still served as an alias for
@@ -117,7 +117,7 @@ docker compose exec invoice-kafka \
 curl -s -H 'X-Correlation-Id: probe-1' \
   -X POST http://localhost:8080/api/orders/generate-invoice \
   -H 'Content-Type: application/json' \
-  -d @src/main/resources/paylods/teste-pf.json
+  -d @src/main/resources/payloads/teste-pf.json
 
 # Scrape the four SLI source meters
 curl -s http://localhost:8080/actuator/prometheus | grep -E '^(http_server_requests|invoice_)'

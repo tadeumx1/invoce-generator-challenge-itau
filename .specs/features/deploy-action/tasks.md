@@ -1,6 +1,6 @@
-# F-CICD Tasks
+# F-DEPLOY-ACTION Tasks
 
-**Spec:** `.specs/features/cicd/spec.md`
+**Spec:** `.specs/features/deploy-action/spec.md`
 **Status:** Done (2026-05-23)
 **Granularity policy:** consolidated vertical slices (5 tasks). Matches the
 F-OBSERVABILITY / F-AWS precedent — each task is one atomic commit covering one coherent
@@ -57,10 +57,10 @@ the YAML parses but no jobs run.
 **Depends on:** none.
 
 **Reuses:** F-AWS Terraform module names and outputs (referenced in the header comment
-as the contract); the `paylods/teste-pf.json` sample payload (referenced as the
+as the contract); the `payloads/teste-pf.json` sample payload (referenced as the
 eventual smoke-test fixture).
 
-**Requirements covered:** CICD-01, CICD-02, CICD-04, CICD-05, CICD-07.
+**Requirements covered:** DEPLOY-01, DEPLOY-02, DEPLOY-04, DEPLOY-05, DEPLOY-07.
 
 **Done when:**
 
@@ -99,7 +99,7 @@ artifact for reviewer auditing.
 **Reuses:** the existing `./mvnw verify` gate (F-UPGRADE / F-OBSERVABILITY / F-AWS all
 use it locally); the `target/site/jacoco/` report path (set up under F-UPGRADE).
 
-**Requirements covered:** CICD-03 (job 1 of 3).
+**Requirements covered:** DEPLOY-03 (job 1 of 3).
 
 **Done when:**
 
@@ -142,8 +142,8 @@ pipeline can read them.
 `cluster_name` / `service_name` outputs, the F-AWS gate command shape documented in
 `infra/terraform/README.md`.
 
-**Requirements covered:** CICD-03 (job 2 of 3), CICD-05, CICD-06, CICD-08, CICD-09,
-CICD-10, CICD-11, CICD-18, CICD-19, CICD-20.
+**Requirements covered:** DEPLOY-03 (job 2 of 3), DEPLOY-05, DEPLOY-06, DEPLOY-08, DEPLOY-09,
+DEPLOY-10, DEPLOY-11, DEPLOY-18, DEPLOY-19, DEPLOY-20.
 
 **Done when:**
 
@@ -183,7 +183,7 @@ AWS rejects on register, then deploys via
 `aws-actions/amazon-ecs-deploy-task-definition@v2` with
 `wait-for-service-stability: true, wait-for-minutes: 10`. Closes with a smoke test
 running `curl -fsS --retry 5` against the API Gateway endpoint with the existing
-`paylods/teste-pf.json` payload.
+`payloads/teste-pf.json` payload.
 
 **Where:**
 
@@ -193,11 +193,11 @@ running `curl -fsS --retry 5` against the API Gateway endpoint with the existing
 **Depends on:** T1, T3 (consumes T3's job outputs).
 
 **Reuses:** the F-DEFECTS-PERFORMANCE production Dockerfile (`./Dockerfile`); the
-F-SAFETY-NET / F-OBSERVABILITY fixture `src/main/resources/paylods/teste-pf.json`; the
+F-SAFETY-NET / F-OBSERVABILITY fixture `src/main/resources/payloads/teste-pf.json`; the
 F-AWS `ecs` module's existing ECR repository, ECS cluster, and ECS service.
 
-**Requirements covered:** CICD-03 (job 3 of 3), CICD-12, CICD-13, CICD-14, CICD-15,
-CICD-16, CICD-17.
+**Requirements covered:** DEPLOY-03 (job 3 of 3), DEPLOY-12, DEPLOY-13, DEPLOY-14, DEPLOY-15,
+DEPLOY-16, DEPLOY-17.
 
 **Done when:**
 
@@ -218,7 +218,7 @@ CICD-16, CICD-17.
 - [x] Smoke test step reads `$API` from `needs.terraform-apply.outputs.api_endpoint`
       and runs `curl -fsS --retry 5 --retry-delay 6 --retry-connrefused -X POST
       "$API/api/orders/generate-invoice" -H 'Content-Type: application/json' -d
-      @src/main/resources/paylods/teste-pf.json`.
+      @src/main/resources/payloads/teste-pf.json`.
 
 **Tests:** Workflow YAML parses cleanly; logical correctness verified by reading the
 ECS deploy step against `aws-actions/amazon-ecs-deploy-task-definition` v2 input schema.
@@ -228,9 +228,9 @@ ECS deploy step against `aws-actions/amazon-ecs-deploy-task-definition` v2 input
 
 ### T5: Docs — ROADMAP entry + STATE ADR
 
-**What:** Add F-CICD to the M3 milestone in `ROADMAP.md` with status COMPLETE and a
+**What:** Add F-DEPLOY-ACTION to the M3 milestone in `ROADMAP.md` with status COMPLETE and a
 one-paragraph summary mirroring the F-AWS / F-POSTMAN entries. Add a new ADR to
-`STATE.md` (AD-031) documenting the F-CICD design decisions: OIDC over committed keys,
+`STATE.md` (AD-031) documenting the F-DEPLOY-ACTION design decisions: OIDC over committed keys,
 commented triggers for proposal-grade posture, rolling deploy over blue/green, live
 task-def re-render over template injection.
 
@@ -248,13 +248,13 @@ already used in STATE.md.
 
 **Done when:**
 
-- [x] `ROADMAP.md` lists F-CICD under M3 with status COMPLETE (2026-05-23) and a
+- [x] `ROADMAP.md` lists F-DEPLOY-ACTION under M3 with status COMPLETE (2026-05-23) and a
       bullet list summarising the three jobs, OIDC, commented triggers, and the two new
       Terraform outputs.
-- [x] `STATE.md` `Recent Decisions` gets a new ADR (AD-031) titled "F-CICD scope —
+- [x] `STATE.md` `Recent Decisions` gets a new ADR (AD-031) titled "F-DEPLOY-ACTION scope —
       proposal-grade GitHub Actions deploy pipeline, OIDC, commented triggers" with
       the standard Decision / Reason / Trade-off / Impact fields.
-- [x] `STATE.md` `Last Updated` and `Current Work` reflect F-CICD completion.
+- [x] `STATE.md` `Last Updated` and `Current Work` reflect F-DEPLOY-ACTION completion.
 
 **Tests:** none (docs-only).
 **Gate:** ROADMAP + STATE diff reviews cleanly.

@@ -276,7 +276,7 @@ aws ecs update-service \
 curl -i -X POST "$(terraform output -raw api_endpoint)/api/orders/generate-invoice" \
   -H 'Content-Type: application/json' \
   -H 'X-Correlation-Id: smoketest-1' \
-  -d @../../src/main/resources/paylods/teste-pf.json
+  -d @../../src/main/resources/payloads/teste-pf.json
 
 # 5. observe
 open "https://console.aws.amazon.com/cloudwatch/home?region=$(terraform output -raw region)#dashboards:name=$(terraform output -raw cloudwatch_dashboard_name)"

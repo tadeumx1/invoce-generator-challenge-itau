@@ -209,7 +209,7 @@ These were considered and deliberately left alone:
 - **`README.md`** — it's the challenge brief from the challenge author; translating it would misrepresent its provenance.
 - **`HELP.md`** — Spring-Initializr boilerplate, all-English already.
 - **`pom.xml` `<groupId>` / `<artifactId>`** — would change the JAR name and could break external tooling; out of scope for a rename.
-- **`src/main/resources/paylods/*.json`** — sample payloads; their values are part of the payload contract. The misspelled directory name (`paylods` vs `payloads`) is left as-is to avoid touching anything outside the rename scope.
+- **`src/main/resources/payloads/*.json`** — sample payloads; their values are part of the payload contract. The misspelled directory name (`payloads` vs `payloads`) is left as-is to avoid touching anything outside the rename scope.
 - **`.classpath` / `.project` / `.settings/`** — Eclipse project metadata, not load-bearing for the Maven build.
 - **JSON keys and enum values** — bound by the README's "payload must not change" rule.
 - **All known business defects** — see `docs/business-rules.md` §6. Static accumulation list, missing `OUTROS` branch, freight fallthrough to 0, sequential side-effects, `double` money math, misleading `@Mock`/`@InjectMocks` in tests. All preserved verbatim.

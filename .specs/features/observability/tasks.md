@@ -93,7 +93,7 @@ sleep 5
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/actuator/health   # → 200
 curl -s -X POST http://localhost:8080/api/orders/generate-invoice \
   -H 'Content-Type: application/json' \
-  -d @src/main/resources/paylods/teste-pf.json | jq -c .
+  -d @src/main/resources/payloads/teste-pf.json | jq -c .
 curl -s http://localhost:8081/actuator/prometheus | grep -c '^http_server_requests'  # ≥ 1
 kill %1
 ```
@@ -221,7 +221,7 @@ already populated — better logs at no extra cost).
 ./mvnw test -Dtest='InvoiceMetricsRecorderTest,CardinalityGuardTest,MetricsIntegrationTest'
 ./mvnw spring-boot:run &
 sleep 5
-curl -s -X POST localhost:8080/api/orders/generate-invoice -H 'Content-Type: application/json' -d @src/main/resources/paylods/teste-pf.json >/dev/null
+curl -s -X POST localhost:8080/api/orders/generate-invoice -H 'Content-Type: application/json' -d @src/main/resources/payloads/teste-pf.json >/dev/null
 curl -s localhost:8081/actuator/prometheus | grep -E '^(invoice_generated_total|invoice_rejected_total|http_server_requests_seconds_bucket\{.*uri="/api/orders/generate-invoice")'
 kill %1
 ```
@@ -310,7 +310,7 @@ OBS-17, OBS-18, OBS-19, OBS-20, OBS-21, OBS-22 (env-var-driven), OBS-23, OBS-28
 ./mvnw test -Dtest='UseCaseObservationTest,KafkaHeaderEnricherTest,HttpTracePropagationIntegrationTest'
 # After F-DEFECTS-PERFORMANCE and docker compose up (with Jaeger):
 docker compose up -d
-curl -s -X POST localhost:8080/api/orders/generate-invoice -H 'Content-Type: application/json' -d @src/main/resources/paylods/teste-pf.json >/dev/null
+curl -s -X POST localhost:8080/api/orders/generate-invoice -H 'Content-Type: application/json' -d @src/main/resources/payloads/teste-pf.json >/dev/null
 open http://localhost:16686  # find the trace by correlationId/traceparent
 ```
 

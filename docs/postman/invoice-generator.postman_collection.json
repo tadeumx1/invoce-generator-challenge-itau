@@ -75,7 +75,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "orders", "generate-invoice"]
             },
-            "description": "Mirror of `src/main/resources/paylods/teste-pf.json`. Exercises the FISICA bracket-0 (totalItemsValue < 500 → tax 0) and SUDESTE freight multiplier 1.048."
+            "description": "Mirror of `src/main/resources/payloads/teste-pf.json`. Exercises the FISICA bracket-0 (totalItemsValue < 500 → tax 0) and SUDESTE freight multiplier 1.048."
           }
         },
         {
@@ -132,7 +132,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "orders", "generate-invoice"]
             },
-            "description": "Mirror of `src/main/resources/paylods/teste-pj-simples.json`. Exercises the JURIDICA + SIMPLES_NACIONAL high-bracket (> 5000) rate 0.19."
+            "description": "Mirror of `src/main/resources/payloads/teste-pj-simples.json`. Exercises the JURIDICA + SIMPLES_NACIONAL high-bracket (> 5000) rate 0.19."
           }
         },
         {

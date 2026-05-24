@@ -52,7 +52,7 @@ requests. After at least one successful run, scrape the SLI source meters from
 ## Maintenance
 
 Keep the bodies of the two "Happy paths" requests in sync with the JSON files under
-`src/main/resources/paylods/` — they're the same fixtures. The rejection-path bodies are
+`src/main/resources/payloads/` — they're the same fixtures. The rejection-path bodies are
 trimmed-down variants of the same payloads with one field changed to trigger each domain
 guard. When new HTTP routes or new rejection codes appear, extend this collection in the
 same commit so reviewers always have a one-click exercise of the API.

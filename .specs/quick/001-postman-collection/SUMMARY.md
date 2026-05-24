@@ -21,7 +21,7 @@
 
 ## Notes for future work
 
-- If the `paylods/` → `payloads/` rename (C-7 in `.specs/codebase/CONCERNS.md`) ever
+- If the `payloads/` → `payloads/` rename (C-7 in `.specs/codebase/CONCERNS.md`) ever
   happens, only the collection's request descriptions need to change — the embedded
   bodies are self-contained and don't reference filesystem paths.
 - When a new rejection code is added to `RejectionCode`, add a matching Postman request

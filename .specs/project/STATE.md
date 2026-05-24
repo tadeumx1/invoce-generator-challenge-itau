@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-23
-**Current Work:** All nine roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-CICD). 88 fast tests still passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean; `.github/workflows/deploy-aws.yml` provides the proposal-grade GitHub Actions deploy pipeline (commented triggers, OIDC). M3 milestone closed.
+**Current Work:** All nine roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-DEPLOY-ACTION). 88 fast tests still passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean; `.github/workflows/deploy-aws.yml` provides the proposal-grade GitHub Actions deploy pipeline (commented triggers, OIDC). M3 milestone closed.
 
 ---
 
@@ -225,9 +225,9 @@ The four F-OBSERVABILITY SLIs from `docs/observability.md` are re-expressed as
 CloudWatch metric math verbatim in the `observability` module — SSOT preserved.
 M3 closes with F-AWS.
 
-### AD-031: F-CICD scope — proposal-grade GitHub Actions deploy pipeline, OIDC, commented triggers (2026-05-23)
+### AD-031: F-DEPLOY-ACTION scope — proposal-grade GitHub Actions deploy pipeline, OIDC, commented triggers (2026-05-23)
 
-**Decision:** F-CICD ships a **proposal-grade** GitHub Actions workflow at
+**Decision:** F-DEPLOY-ACTION ships a **proposal-grade** GitHub Actions workflow at
 `.github/workflows/deploy-aws.yml` — the YAML parses cleanly as a runnable workflow but
 the `on:` triggers are commented out with an inert `workflow_dispatch` placeholder so
 nothing fires against a live AWS account. AWS authentication uses GitHub OIDC
@@ -257,12 +257,12 @@ run; flipping the workflow to active requires uncommenting four lines of `on:` b
 provisioning the IAM role + OIDC trust policy, populating the four repo variables
 and two secrets, and removing the inert `workflow_dispatch` placeholder.
 
-**Impact:** F-CICD closes the gap F-AWS explicitly left as out-of-scope ("CI/CD
+**Impact:** F-DEPLOY-ACTION closes the gap F-AWS explicitly left as out-of-scope ("CI/CD
 pipeline ... a separate concern"). Two new root Terraform outputs (`ecs_cluster_name`,
 `ecs_service_name`) were added to `infra/terraform/outputs.tf` so the pipeline reads
 live ECS resource names rather than re-deriving naming conventions. The F-AWS gate
 (`terraform fmt -recursive -check + init -backend=false + validate`) stays green after
-the additions. The roadmap closes M3 with F-CICD as the ninth and final feature.
+the additions. The roadmap closes M3 with F-DEPLOY-ACTION as the ninth and final feature.
 
 ### AD-029: F-OBSERVABILITY audit — registered ≠ wired (2026-05-23)
 
@@ -311,7 +311,7 @@ None.
 
 ## Lessons Learned
 
-### L-001: The `paylods/` typo is load-bearing for the path-based `curl` examples in our docs
+### L-001: The `payloads/` typo is load-bearing for the path-based `curl` examples in our docs
 
 **Context:** Documenting the `curl` example for the sample request in CLAUDE.md and translation-changelog.md.
 **Problem:** Catching the misspelling mid-rename and "fixing" it would have invalidated every doc reference and broken the manual-test path until they were all updated.
@@ -374,7 +374,7 @@ Ideas captured during work that belong in future features or phases. Prevents sc
 
 - [ ] Add an `Idempotency-Key` header on `POST /api/orders/generate-invoice` so retries are safe — **Captured during:** brownfield mapping. Belongs in F-RESILIENCE.
 - [ ] Webhook receiver for the delivery system's async confirmation — **Captured during:** integrations doc. Belongs in F-RESILIENCE.
-- [ ] Rename `src/main/resources/paylods/` → `payloads/` — **Captured during:** rename work (C-7).
+- [x] Rename `src/main/resources/paylods/` → `payloads/` (C-7) — **Closed:** 2026-05-23. Sweep covered all 24 referencing files (CLAUDE/README/docs/specs/CI workflow); `./mvnw test` green.
 - [ ] JaCoCo coverage gate in CI with per-layer thresholds (≥80 % domain/use-case, ≥60 % adapter) — **Captured during:** TESTING.md. Belongs in F-UPGRADE.
 - [ ] Add `@Validated` + Bean Validation annotations on the `Order` payload (e.g., `@Positive`, `@NotNull`) — **Captured during:** brownfield mapping. Belongs in a future validation hardening task; F-DEFECTS-FUNCTIONAL already covers C-2/C-3 domain policy.
 - [ ] Document an ADR comparing CDK vs Terraform if the user wants to revisit AD-005 — **Captured during:** AWS sizing question.

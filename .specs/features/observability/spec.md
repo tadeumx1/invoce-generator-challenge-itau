@@ -117,7 +117,7 @@ are unreproducible from production logs.
 ```bash
 ./mvnw test -Dtest='*LoggingIntegrationTest,*CorrelationIdFilterTest'
 curl -s -H 'X-Correlation-Id: probe-123' -X POST localhost:8080/api/orders/generate-invoice \
-  -H 'Content-Type: application/json' -d @src/main/resources/paylods/teste-pf.json
+  -H 'Content-Type: application/json' -d @src/main/resources/payloads/teste-pf.json
 docker compose logs app | jq -c 'select(.correlationId == "probe-123")'
 ```
 
@@ -205,7 +205,7 @@ async dispatch lands.
 
 ```bash
 docker compose up -d
-curl -X POST localhost:8080/api/orders/generate-invoice -H 'Content-Type: application/json' -d @src/main/resources/paylods/teste-pf.json
+curl -X POST localhost:8080/api/orders/generate-invoice -H 'Content-Type: application/json' -d @src/main/resources/payloads/teste-pf.json
 open http://localhost:16686  # Jaeger UI shows trace with HTTP → invoice.generate → 4× messaging.publish spans
 ```
 

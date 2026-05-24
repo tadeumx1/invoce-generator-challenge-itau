@@ -26,7 +26,7 @@
 │       └── service/      # Domain services / rule tables
 ├── src/main/resources/
 │   ├── application.properties
-│   └── paylods/          # Misspelled sample payload directory, kept for compatibility
+│   └── payloads/          # Misspelled sample payload directory, kept for compatibility
 ├── src/test/java/br/com/itau/invoicegenerator/
 │   ├── GenerateInvoiceInteractorTest.java
 │   ├── InvoiceGeneratorApplicationTests.java
@@ -67,4 +67,4 @@ Reusable builders/fakes for tests, including `TestUseCases` and `RecordingTaxRat
 - Freight: `domain/service/LegacyFreightCalculator.java`
 - Side-effect ports: `domain/port/*.java`
 - Simulated integrations: `adapter/integration/**`
-- Sample payloads: `src/main/resources/paylods/teste-pf.json`, `teste-pj-simples.json`
+- Sample payloads: `src/main/resources/payloads/teste-pf.json`, `teste-pj-simples.json`

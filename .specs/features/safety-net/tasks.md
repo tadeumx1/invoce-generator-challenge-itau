@@ -390,7 +390,7 @@ Single Spring context; not [P] with anything in Phase 2 that uses `@SpringBootTe
 **Where:** create `src/test/java/br/com/itau/invoicegenerator/web/InvoiceControllerIntegrationTest.java`
 
 **Depends on:** T1, T2, T3, T4
-**Reuses:** `paylods/teste-pf.json`, `paylods/teste-pj-simples.json` (read via classpath resources).
+**Reuses:** `payloads/teste-pf.json`, `payloads/teste-pj-simples.json` (read via classpath resources).
 **Requirement:** SAFETY-24, SAFETY-25, SAFETY-26.
 
 **Tools:**
