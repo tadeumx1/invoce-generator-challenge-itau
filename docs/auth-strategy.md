@@ -1,7 +1,9 @@
 # Authentication & Authorization Strategy
 
-**Status:** Documented, not implemented (per F-AWS scope; see
-[`docs/aws-architecture.md` ADR-032](aws-architecture.md)).
+**Status:** **Demo-grade implementation shipped under F-AUTH (2026-05-24)** —
+intentionally diverging from the recommendation below, see "What this codebase
+actually ships" near the bottom. The production recommendation in this document
+remains authoritative for any real deployment.
 **Audience:** SREs / staff engineers deciding when to flip the public endpoint
 from open to authenticated, and what shape the auth layer should take.
 
@@ -165,6 +167,60 @@ object, not a `Jwt`.
   application layer; the spec for that work doesn't exist yet.
 - Refresh-token / token-revocation handling — that's the IdP's problem,
   not this service's.
+
+## What this codebase actually ships (F-AUTH, 2026-05-24)
+
+This section describes the implementation that exists *today*. It contradicts the
+recommendation in the rest of this document on purpose: the user heard the
+edge-validates argument and chose to ship an in-app demo of the OAuth2 Resource Server
+pattern as part of the technical challenge. Treat this as a **demonstration**, not
+a production recommendation.
+
+What's wired:
+
+- **`POST /api/auth/login`** accepting `{username, password}`, returning OAuth2-shaped
+  `{access_token, token_type, expires_in, scope}`. HS256 symmetric signing with the
+  secret in `app.security.jwt.secret`. Two hardcoded demo users (`demo`/`demo123`,
+  `admin`/`admin123`) loaded by `InMemoryUserStore` with BCrypt-hashed passwords.
+- **`spring-boot-starter-oauth2-resource-server`** on the classpath. `SecurityFilterChain`
+  requires `SCOPE_invoice:write` on `POST /api/orders/generate-invoice` and the legacy
+  alias `POST /api/pedido/gerarNotaFiscal`. Public endpoints: `/api/auth/login`,
+  `/actuator/health`, `/actuator/health/**`, `/actuator/info`, `/actuator/prometheus`.
+- **`{codigo, mensagem}`** envelope on every auth failure
+  (`INVALID_CREDENTIALS`, `INVALID_LOGIN_PAYLOAD`, `UNAUTHORIZED`, `FORBIDDEN`) so the
+  client contract matches the rest of the API.
+- **Tests**: `JwtTestSupport` mints real HS256 tokens; existing integration tests
+  attach a `Bearer` header; two new test classes
+  (`AuthControllerIntegrationTest`, `SecurityIntegrationTest`) cover the login flow
+  + the filter chain. Total: 103 fast tests, all green.
+
+What's deliberately divergent from the recommendation above:
+
+1. **The service is its own issuer.** A real deployment puts Cognito or an external
+   IdP in front of the API Gateway; the invoice-generator trusts gateway-propagated
+   headers and does not run an OAuth2 Resource Server. F-AUTH does the opposite — the
+   service both issues and validates — because the demo's whole point is to show the
+   Spring Security pattern in one process.
+2. **HS256 instead of RS256 + JWKS.** Symmetric secret over keypair + JWKS endpoint.
+   See AD-032 for the rationale (single-app demo).
+3. **In-memory user store.** No user directory, no registration, no password reset,
+   no audit log of login attempts, no rate limiting. Hardcoded users with
+   BCrypt-hashed passwords loaded at bean construction.
+4. **No refresh tokens.** Re-login on expiry.
+
+If a stakeholder is reading this section to decide what production should look like,
+read everything *above* this section instead — that's the recommendation. F-AUTH is
+the artefact that exists, not the architecture you'd ship.
+
+The migration path from F-AUTH to the recommended production path:
+
+1. Bring up Cognito or an external IdP. Issue tokens there.
+2. Add the API Gateway's JWT authorizer in front of this service (already in scope of
+   F-AWS, captured under ADR-032).
+3. Either keep `spring-boot-starter-oauth2-resource-server` here as defense in depth
+   (validate twice — once at the gateway, once at the service) or remove it entirely
+   and read `X-User-Id` / `X-Tenant-Id` / `X-Scopes` from gateway-propagated headers.
+4. Decommission `AuthController` + `JwtIssuer` + `InMemoryUserStore`.
 
 ## Related references
 

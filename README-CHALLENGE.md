@@ -91,6 +91,9 @@ M2 — Defeitos funcionais (2/2) ✅
 M3 — Operações (5/5) ✅
   F-RESILIENCE ✅   F-OBSERVABILITY ✅   F-AWS ✅
   F-POSTMAN ✅      F-DEPLOY-ACTION ✅
+
+M4 — Segurança & access control (1/1) ✅
+  F-AUTH ✅
 ```
 
 Legenda: ✅ implementado.
@@ -128,7 +131,7 @@ Legenda: ✅ implementado.
 | Item do README | Feature | Status |
 |---|---|---|
 | API Gateway | **F-AWS** | ✅ API Gateway HTTP API + VPC Link + internal ALB (módulo `infra/terraform/modules/api-gateway`); access logs JSON ecoando `X-Correlation-Id` |
-| Autenticação / autorização | **F-AWS** | 🟡 Documentado em [`docs/auth-strategy.md`](docs/auth-strategy.md) + [`docs/aws-architecture.md`](docs/aws-architecture.md) (ADR-032: Cognito User Pool vs JWT verifier externo) — não provisionado por escopo |
+| Autenticação / autorização | **F-AUTH** + **F-AWS** | ✅ Demo-grade: `POST /api/auth/login` emite JWT HS256, `oauth2ResourceServer` valida tokens e exige `SCOPE_invoice:write` nos endpoints de invoice (F-AUTH). Comparação Cognito vs JWT externo para produção fica documentada em [`docs/auth-strategy.md`](docs/auth-strategy.md) + [`docs/aws-architecture.md`](docs/aws-architecture.md) (ADR-032) — F-AUTH é demonstração; recomendação de produção continua sendo edge-validates |
 | APIs externas ou internas consumidas | **F-CLEAN** (ports) + **F-DEFECTS-PERFORMANCE** (eventos Kafka) | ✅ Domain ports + 4 tópicos Kafka definidos |
 | Tratamento de integrações lentas | **F-DEFECTS-PERFORMANCE** + **F-RESILIENCE** | ✅ Kafka async dispatch + `@RetryableTopic` + DLT; `@CircuitBreaker` por adapter (Resilience4j 2.2.0) |
 | Filas / processamento assíncrono | **F-DEFECTS-PERFORMANCE** | ✅ 4 tópicos `invoice.*.v1` + retry topics + DLT, consumers em grupos isolados |
@@ -148,6 +151,11 @@ As três features de fechamento de M3 endereçam diretamente os itens "Documenta
 
 - **F-DEPLOY-ACTION** → cobre **"Planejamento de deploy e operação"** do lado de pipeline.
   Workflow GitHub Actions em `.github/workflows/deploy-aws.yml` com 3 jobs: `build-and-test` (`./mvnw verify` + JaCoCo artifact) → `terraform-apply` (`fmt -check` → `init` com S3+DynamoDB → `validate` → `plan` como artifact → `apply`) → `docker-deploy` (Buildx → ECR tag `${{ github.sha }}` → re-render da task-def viva via `aws ecs describe-task-definition` + `jq` → `aws-actions/amazon-ecs-deploy-task-definition@v2` com `wait-for-service-stability` → smoke test `curl` na API Gateway). Auth via GitHub OIDC — sem `AWS_ACCESS_KEY_ID` no repo. Triggers comentados (mesma postura proposal-grade do F-AWS — valida como YAML executável mas não dispara contra conta real).
+
+### Feature de M4 — Autenticação demo
+
+- **F-AUTH** → cobre **"Autenticação / autorização"** da Proposta de Arquitetura.
+  Spring Security 6 + `spring-boot-starter-oauth2-resource-server`. `POST /api/auth/login` aceita `{username,password}` e devolve `{access_token, token_type:"Bearer", expires_in, scope}` (formato OAuth2). HS256 com secret em `app.security.jwt.secret`. Dois usuários hardcoded: `demo`/`demo123` (`invoice:write`) e `admin`/`admin123` (`invoice:write invoice:admin`); senhas BCrypt-hashadas na construção do bean. `oauth2ResourceServer().jwt()` valida tokens nos endpoints protegidos e exige `SCOPE_invoice:write` em `POST /api/orders/generate-invoice` + alias legado. Públicos: actuator health/info/prometheus + login. Envelope de erro segue o `{codigo, mensagem}` existente (`INVALID_CREDENTIALS`, `INVALID_LOGIN_PAYLOAD`, `UNAUTHORIZED`, `FORBIDDEN`). 103 testes fast (88 antigos + 15 novos em `AuthControllerIntegrationTest` + `SecurityIntegrationTest`). **Demo intencionalmente diverge** da recomendação de produção em [`docs/auth-strategy.md`](docs/auth-strategy.md) (edge-validates com Cognito/IdP externo no API Gateway) — o usuário escolheu a implementação in-app como demonstração do padrão OAuth2 Resource Server.
 
 ### Onde olhar
 

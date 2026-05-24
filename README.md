@@ -67,16 +67,29 @@ test, enforces Spotless + Checkstyle, and emits the JaCoCo report at
 
 ### Hitting the API locally
 
+The invoice endpoint requires a JWT (F-AUTH, see [`docs/auth-strategy.md`](docs/auth-strategy.md)).
+Log in first, then attach the token to the invoice request:
+
 ```bash
 ./mvnw spring-boot:run &
 sleep 8
+
+# 1) Log in with the demo user.
+TOKEN=$(curl -sS -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"demo123"}' \
+  | jq -r .access_token)
+
+# 2) Call the invoice endpoint.
 curl -X POST http://localhost:8080/api/orders/generate-invoice \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d @src/main/resources/payloads/teste-pf.json
 ```
 
-The legacy URL `POST /api/pedido/gerarNotaFiscal` is still served as an alias for
-backwards compatibility.
+Demo users: `demo`/`demo123` (scope `invoice:write`) and `admin`/`admin123` (scope
+`invoice:write invoice:admin`). The legacy URL `POST /api/pedido/gerarNotaFiscal` is
+served as an alias for backwards compatibility and is equally protected.
 
 ### Postman collection
 
@@ -348,6 +361,19 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
    for dedupe. Local stack via `docker compose up` with Confluent KRaft. **64 fast
    tests + 1 slow + EmbeddedKafka end-to-end.**
 
+### M4 — Security & access control (complete)
+
+11. **F-AUTH** — Demo-grade JWT auth: `POST /api/auth/login` issues HS256 tokens for
+    2 hardcoded users (BCrypt-hashed); `oauth2ResourceServer().jwt()` enforces
+    `SCOPE_invoice:write` on `POST /api/orders/generate-invoice` and the legacy alias.
+    Public endpoints (actuator health/info/prometheus + login) stay open. Auth errors
+    carry the existing `{codigo, mensagem}` envelope (`INVALID_CREDENTIALS`,
+    `INVALID_LOGIN_PAYLOAD`, `UNAUTHORIZED`, `FORBIDDEN`). 88 fast tests → 103 fast
+    tests (15 new in `AuthControllerIntegrationTest` + `SecurityIntegrationTest`).
+    Intentionally diverges from the production recommendation in
+    [`docs/auth-strategy.md`](docs/auth-strategy.md) — see ADR AD-032 in
+    [`STATE.md`](.specs/project/STATE.md) for the rationale.
+
 ### M3 — Operations (complete)
 
 6. **F-RESILIENCE** — Resilience4j `@CircuitBreaker` on each of the four outbound
@@ -392,7 +418,7 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
 
 ### Notable architectural decisions
 
-Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (31 ADRs total):
+Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (32 ADRs total):
 
 - **AD-009** Clean Architecture with adapter-owned JSON DTOs — domain/application are
   free of Spring and Jackson.
@@ -418,6 +444,10 @@ Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (31 ADRs total)
   OIDC for auth and live task-definition re-render (so any Terraform-managed
   container field — env vars, ADOT sidecar, resource sizes — is preserved across
   deploys).
+- **AD-032** F-AUTH: HS256 over RS256, in-memory user store, scope-based authZ,
+  `JwtTestSupport` test pattern. Explicitly diverges from the edge-validates
+  production recommendation in `docs/auth-strategy.md` because the user wanted a
+  working demonstration of the OAuth2 Resource Server pattern in this codebase.
 
 ### Where to look for the rest
 

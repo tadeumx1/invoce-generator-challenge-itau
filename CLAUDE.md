@@ -29,13 +29,22 @@ Read `README.md` and `docs/business-rules.md` before changing behavior. `docs/bu
 ./mvnw spotless:apply         # format Java sources
 ```
 
-Exercising the API locally:
+Exercising the API locally (F-AUTH requires a JWT):
 
 ```bash
+TOKEN=$(curl -sS -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"demo123"}' | jq -r .access_token)
+
 curl -X POST http://localhost:8080/api/orders/generate-invoice \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d @src/main/resources/payloads/teste-pf.json
 ```
+
+Demo users: `demo`/`demo123` (scope `invoice:write`) and `admin`/`admin123` (scope `invoice:write invoice:admin`).
+See [`docs/auth-strategy.md`](docs/auth-strategy.md) and AD-032 in `STATE.md` for the rationale (intentionally
+diverges from the edge-validates production recommendation).
 
 C-7 closed (2026-05-23): the sample directory is now `payloads/` (was `paylods/`); every doc, test, and spec reference has been updated.
 

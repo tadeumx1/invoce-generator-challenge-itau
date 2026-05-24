@@ -1,7 +1,7 @@
 # State
 
-**Last Updated:** 2026-05-23
-**Current Work:** All nine roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-DEPLOY-ACTION). 88 fast tests still passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean; `.github/workflows/deploy-aws.yml` provides the proposal-grade GitHub Actions deploy pipeline (commented triggers, OIDC). M3 milestone closed.
+**Last Updated:** 2026-05-24
+**Current Work:** All ten roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-DEPLOY-ACTION, F-AUTH). 103 fast tests passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean; `.github/workflows/deploy-aws.yml` provides the proposal-grade GitHub Actions deploy pipeline (commented triggers, OIDC); F-AUTH adds demo-grade JWT auth with `POST /api/auth/login` + Spring Security 6 resource server protecting the invoice endpoints. M3 and M4 milestones closed.
 
 ---
 
@@ -224,6 +224,70 @@ api-gateway, observability). `terraform fmt -recursive -check + init -backend=fa
 The four F-OBSERVABILITY SLIs from `docs/observability.md` are re-expressed as
 CloudWatch metric math verbatim in the `observability` module — SSOT preserved.
 M3 closes with F-AWS.
+
+### AD-032: F-AUTH scope — demo-grade in-app HS256 JWT, in-memory user store, scope-based authZ, JwtTestSupport (2026-05-24)
+
+**Decision:** F-AUTH ships an **in-app JWT issuer + Spring Security 6 OAuth2 Resource
+Server** for demonstration purposes. Four design choices freeze the implementation:
+
+1. **HS256 symmetric signing** with a shared secret from `app.security.jwt.secret`,
+   instead of RS256 + JWKS. The same `NimbusJwtEncoder` and `NimbusJwtDecoder` beans
+   read the same `SecretKey` bean.
+2. **In-memory `InMemoryUserStore`** holding two hardcoded users (`demo`/`demo123`,
+   `admin`/`admin123`). Passwords hashed at bean construction via
+   `BCryptPasswordEncoder` — the source code carries no plaintext nor literal BCrypt
+   hashes.
+3. **Scope-based authorization** via `SCOPE_*` authorities. Spring Security's default
+   `JwtAuthenticationConverter` maps the space-separated `scope` JWT claim to
+   `SCOPE_<value>` `GrantedAuthority` instances; the filter chain calls
+   `.hasAuthority("SCOPE_invoice:write")` on the invoice endpoints.
+4. **`JwtTestSupport` `@TestComponent`** mints real HS256 tokens via the production
+   `JwtEncoder` bean. Integration tests attach `Authorization: Bearer <token>` and
+   exercise the full filter chain. No `@WithMockUser`, no
+   `@AutoConfigureMockMvc(addFilters=false)`.
+
+**Reason:** The user explicitly chose this in-app implementation as a working demonstration
+of the OAuth2 Resource Server pattern in Spring Boot 3.5.x, **diverging from the
+edge-validates recommendation in `docs/auth-strategy.md` and ADR-032 of
+`docs/aws-architecture.md`**. Both recommendations remain authoritative for production
+deployments; this implementation is for the technical challenge only.
+
+The four sub-decisions follow:
+
+- HS256 over RS256: single-app demo needs one property, not a JWKS endpoint.
+- In-memory over DB/LDAP: mirrors the AD-024 `IdempotencyStore` precedent — demo
+  artifact, production replaces with a durable backend.
+- Scope-based over role-based: aligns with OAuth2 conventions and the JWT shape
+  documented in `docs/auth-strategy.md`.
+- `JwtTestSupport` over Spring Security test shortcuts: the F-OBSERVABILITY audit
+  (AD-029) taught the project that "bean wired but not exercised under the real
+  filter chain" is the failure mode that ships broken code. Real tokens through the
+  full chain is the only way to catch the next instance of that.
+
+**Trade-off:** A real production deployment must do all of:
+
+- Move to RS256 + JWKS at the IdP boundary so the secret no longer needs to be shared.
+- Replace `InMemoryUserStore` with a real user directory + password reset / lockout /
+  audit.
+- Add refresh tokens, rate limiting on `/api/auth/login`, optional method security
+  (`@PreAuthorize`).
+- Either keep the in-service JWT validation only as defense-in-depth behind a
+  validated edge, or remove it entirely and trust gateway-propagated claim headers
+  (the path documented in `docs/auth-strategy.md`).
+
+These are all captured in `ROADMAP.md` Future Considerations.
+
+**Impact:** New `adapter/security/` package (12 files) — `SecurityConfig`,
+`ApiSecurityProperties`, `login/{AuthController, JwtIssuer, InMemoryUserStore,
+DemoUser, LoginRequest, LoginResponse, InvalidCredentialsException,
+InvalidLoginPayloadException}`, `error/{ApiBearerAuthenticationEntryPoint,
+ApiBearerAccessDeniedHandler}`. `ApiExceptionHandler` extended with two new mappings.
+`pom.xml` gains `spring-boot-starter-security` + `spring-boot-starter-oauth2-resource-server`
++ `spring-security-test` (test scope). `application.properties` gains the
+`app.security.jwt.*` block. Four existing integration tests gain
+`Authorization: Bearer` headers via the new `JwtTestSupport` helper. Two new
+integration test classes (`AuthControllerIntegrationTest`, `SecurityIntegrationTest`)
+add 15 tests. Total fast test count: 88 → 103.
 
 ### AD-031: F-DEPLOY-ACTION scope — proposal-grade GitHub Actions deploy pipeline, OIDC, commented triggers (2026-05-23)
 

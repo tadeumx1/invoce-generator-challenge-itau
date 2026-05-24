@@ -10,14 +10,131 @@
       "key": "baseUrl",
       "value": "http://localhost:8080",
       "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
     }
   ],
   "item": [
     {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /api/auth/login \u2014 demo user (issues JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('returns OAuth2-shaped token response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('access_token');",
+                  "  pm.expect(body.access_token).to.match(/^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/);",
+                  "  pm.expect(body.token_type).to.eql('Bearer');",
+                  "  pm.expect(body.expires_in).to.be.a('number').and.above(0);",
+                  "  pm.expect(body.scope).to.include('invoice:write');",
+                  "});",
+                  "pm.test('stores access_token on collection variable for downstream requests', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('accessToken', body.access_token);",
+                  "  pm.expect(pm.collectionVariables.get('accessToken')).to.eql(body.access_token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-auth-login"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "F-AUTH demo. Issues an HS256 JWT for the `demo` user (scope `invoice:write`). The collection-level Pre-request script auto-runs this whenever `accessToken` is unset, so subsequent requests just use `Authorization: Bearer {{accessToken}}`."
+          }
+        },
+        {
+          "name": "POST /api/auth/login \u2014 wrong password (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 401 Unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('error envelope is {codigo:INVALID_CREDENTIALS, mensagem}', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.codigo).to.eql('INVALID_CREDENTIALS');",
+                  "  pm.expect(body.mensagem).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-auth-bad-password"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"WRONG\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "F-AUTH rejection. Proves the 401 + INVALID_CREDENTIALS contract."
+          }
+        }
+      ]
+    },
+    {
       "name": "Happy paths",
       "item": [
         {
-          "name": "POST /api/orders/generate-invoice — FISICA (teste-pf.json)",
+          "name": "POST /api/orders/generate-invoice \u2014 FISICA (teste-pf.json)",
           "event": [
             {
               "listen": "test",
@@ -39,11 +156,11 @@
                   "  pm.expect(body).to.have.property('destinatario');",
                   "  pm.expect(body.destinatario.tipo_pessoa).to.eql('FISICA');",
                   "});",
-                  "pm.test('FISICA totalItemsValue=100 < 500 → tax = 0', function () {",
+                  "pm.test('FISICA totalItemsValue=100 < 500 \u2192 tax = 0', function () {",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.itens[0].valor_tributo_item).to.eql(0);",
                   "});",
-                  "pm.test('SUDESTE freight = 10.0 × 1.048 = 10.48', function () {",
+                  "pm.test('SUDESTE freight = 10.0 \u00d7 1.048 = 10.48', function () {",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.valor_frete).to.be.closeTo(10.48, 0.001);",
                   "});",
@@ -64,22 +181,32 @@
               {
                 "key": "X-Correlation-Id",
                 "value": "postman-pf-happy"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 100.0,\n  \"valor_frete\": 10.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Teclado USB\",\n      \"valor_unitario\": 50,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"FISICA\",\n    \"documentos\": [\n      { \"tipo\": \"CPF\", \"numero\": \"88740347095\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"São Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 100.0,\n  \"valor_frete\": 10.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Teclado USB\",\n      \"valor_unitario\": 50,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"FISICA\",\n    \"documentos\": [\n      { \"tipo\": \"CPF\", \"numero\": \"88740347095\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"S\u00e3o Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/generate-invoice",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "generate-invoice"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "generate-invoice"
+              ]
             },
-            "description": "Mirror of `src/main/resources/payloads/teste-pf.json`. Exercises the FISICA bracket-0 (totalItemsValue < 500 → tax 0) and SUDESTE freight multiplier 1.048."
+            "description": "Mirror of `src/main/resources/payloads/teste-pf.json`. Exercises the FISICA bracket-0 (totalItemsValue < 500 \u2192 tax 0) and SUDESTE freight multiplier 1.048."
           }
         },
         {
-          "name": "POST /api/orders/generate-invoice — JURIDICA SIMPLES_NACIONAL (teste-pj-simples.json)",
+          "name": "POST /api/orders/generate-invoice \u2014 JURIDICA SIMPLES_NACIONAL (teste-pj-simples.json)",
           "event": [
             {
               "listen": "test",
@@ -93,11 +220,11 @@
                   "  const body = pm.response.json();",
                   "  pm.expect(body.destinatario.tipo_pessoa).to.eql('JURIDICA');",
                   "});",
-                  "pm.test('JURIDICA SIMPLES totalItemsValue=5840 > 5000 → rate 0.19 → 730 × 0.19 = 138.7', function () {",
+                  "pm.test('JURIDICA SIMPLES totalItemsValue=5840 > 5000 \u2192 rate 0.19 \u2192 730 \u00d7 0.19 = 138.7', function () {",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.itens[0].valor_tributo_item).to.be.closeTo(138.7, 0.001);",
                   "});",
-                  "pm.test('SUDESTE freight = 72 × 1.048 = 75.46 (HALF_EVEN, scale 2)', function () {",
+                  "pm.test('SUDESTE freight = 72 \u00d7 1.048 = 75.46 (HALF_EVEN, scale 2)', function () {",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.valor_frete).to.be.closeTo(75.46, 0.001);",
                   "});",
@@ -121,22 +248,32 @@
               {
                 "key": "X-Correlation-Id",
                 "value": "postman-pj-simples-happy"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 5840.0,\n  \"valor_frete\": 72.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Monitor LCD SAMSUNG\",\n      \"valor_unitario\": 730,\n      \"quantidade\": 8\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"JURIDICA\",\n    \"regime_tributacao\": \"SIMPLES_NACIONAL\",\n    \"documentos\": [\n      { \"tipo\": \"CNPJ\", \"numero\": \"49695613000180\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"São Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 5840.0,\n  \"valor_frete\": 72.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Monitor LCD SAMSUNG\",\n      \"valor_unitario\": 730,\n      \"quantidade\": 8\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"JURIDICA\",\n    \"regime_tributacao\": \"SIMPLES_NACIONAL\",\n    \"documentos\": [\n      { \"tipo\": \"CNPJ\", \"numero\": \"49695613000180\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"S\u00e3o Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/generate-invoice",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "generate-invoice"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "generate-invoice"
+              ]
             },
             "description": "Mirror of `src/main/resources/payloads/teste-pj-simples.json`. Exercises the JURIDICA + SIMPLES_NACIONAL high-bracket (> 5000) rate 0.19."
           }
         },
         {
-          "name": "POST /api/pedido/gerarNotaFiscal — legacy Portuguese alias",
+          "name": "POST /api/pedido/gerarNotaFiscal \u2014 legacy Portuguese alias",
           "event": [
             {
               "listen": "test",
@@ -165,16 +302,26 @@
               {
                 "key": "X-Correlation-Id",
                 "value": "postman-legacy-alias"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 100.0,\n  \"valor_frete\": 10.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Teclado USB\",\n      \"valor_unitario\": 50,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"FISICA\",\n    \"documentos\": [\n      { \"tipo\": \"CPF\", \"numero\": \"88740347095\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"São Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+              "raw": "{\n  \"id_pedido\": 1,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 100.0,\n  \"valor_frete\": 10.0,\n  \"itens\": [\n    {\n      \"id_item\": 1,\n      \"descricao\": \"Teclado USB\",\n      \"valor_unitario\": 50,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"John Doe\",\n    \"tipo_pessoa\": \"FISICA\",\n    \"documentos\": [\n      { \"tipo\": \"CPF\", \"numero\": \"88740347095\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 anndar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"S\u00e3o Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/pedido/gerarNotaFiscal",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "pedido", "gerarNotaFiscal"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pedido",
+                "gerarNotaFiscal"
+              ]
             },
             "description": "Backwards-compat alias kept for legacy clients (see `InvoiceController` `@PostMapping`). Same handler, same contract."
           }
@@ -185,7 +332,7 @@
       "name": "Rejections (HTTP 400)",
       "item": [
         {
-          "name": "UNSUPPORTED_TAX_REGIME — JURIDICA + OUTROS",
+          "name": "UNSUPPORTED_TAX_REGIME \u2014 JURIDICA + OUTROS",
           "event": [
             {
               "listen": "test",
@@ -214,6 +361,10 @@
               {
                 "key": "X-Correlation-Id",
                 "value": "postman-reject-outros"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
@@ -222,14 +373,20 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/generate-invoice",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "generate-invoice"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "generate-invoice"
+              ]
             },
-            "description": "JURIDICA + OUTROS is explicitly unsupported (F-DEFECTS-FUNCTIONAL C-2). Domain throws `InvalidInvoiceOrderException(\"UNSUPPORTED_TAX_REGIME\", …)`; web layer maps to 400 and emits `invoice_rejected_total{reason=\"UNSUPPORTED_TAX_REGIME\"}`."
+            "description": "JURIDICA + OUTROS is explicitly unsupported (F-DEFECTS-FUNCTIONAL C-2). Domain throws `InvalidInvoiceOrderException(\"UNSUPPORTED_TAX_REGIME\", \u2026)`; web layer maps to 400 and emits `invoice_rejected_total{reason=\"UNSUPPORTED_TAX_REGIME\"}`."
           }
         },
         {
-          "name": "INVALID_TAX_REGIME — JURIDICA without taxRegime",
+          "name": "INVALID_TAX_REGIME \u2014 JURIDICA without taxRegime",
           "event": [
             {
               "listen": "test",
@@ -257,6 +414,10 @@
               {
                 "key": "X-Correlation-Id",
                 "value": "postman-reject-missing-regime"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
@@ -265,14 +426,20 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/generate-invoice",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "generate-invoice"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "generate-invoice"
+              ]
             },
             "description": "JURIDICA recipient missing `regime_tributacao` is rejected (F-DEFECTS-FUNCTIONAL C-2). Distinct code from UNSUPPORTED_TAX_REGIME so operators can tell \"client sent OUTROS\" from \"client forgot the field\"."
           }
         },
         {
-          "name": "INVALID_DELIVERY_REGION — regiao = null on the delivery address",
+          "name": "INVALID_DELIVERY_REGION \u2014 regiao = null on the delivery address",
           "event": [
             {
               "listen": "test",
@@ -300,6 +467,10 @@
               {
                 "key": "X-Correlation-Id",
                 "value": "postman-reject-no-region"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
@@ -308,13 +479,46 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/generate-invoice",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "generate-invoice"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "generate-invoice"
+              ]
             },
             "description": "Delivery address without a `regiao` value is rejected (F-DEFECTS-FUNCTIONAL C-3). `LegacyFreightCalculator` throws `INVALID_DELIVERY_REGION` because freight cannot be computed without a region multiplier."
           }
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// F-AUTH \u2014 auto-login at collection level if accessToken is unset/empty.",
+          "// Runs before EVERY request. Skips the actual login request (no recursion).",
+          "if (pm.request.url.getPath().endsWith('/api/auth/login')) { return; }",
+          "const current = pm.collectionVariables.get('accessToken');",
+          "if (current && current.length > 0) { return; }",
+          "const baseUrl = pm.collectionVariables.get('baseUrl');",
+          "pm.sendRequest({",
+          "  url: baseUrl + '/api/auth/login',",
+          "  method: 'POST',",
+          "  header: { 'Content-Type': 'application/json' },",
+          "  body: { mode: 'raw', raw: JSON.stringify({ username: 'demo', password: 'demo123' }) }",
+          "}, (err, res) => {",
+          "  if (err) { console.error('auto-login failed', err); return; }",
+          "  if (res.code !== 200) { console.error('auto-login non-200', res.code, res.text()); return; }",
+          "  const body = res.json();",
+          "  pm.collectionVariables.set('accessToken', body.access_token);",
+          "});"
+        ]
+      }
     }
   ]
 }

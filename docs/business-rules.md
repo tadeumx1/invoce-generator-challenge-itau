@@ -10,14 +10,57 @@ The original codebase is in Portuguese. This document uses English for prose and
 
 ## 1. Endpoint
 
-| Method | Path                          | Body         | Response |
-| ------ | ----------------------------- | ------------ | -------- |
-| POST   | `/api/orders/generate-invoice`| `Order` JSON | `Invoice` JSON |
+| Method | Path                          | Body         | Response | Auth |
+| ------ | ----------------------------- | ------------ | -------- | ---- |
+| POST   | `/api/auth/login`             | `{username, password}` | `{access_token, token_type, expires_in, scope}` | public |
+| POST   | `/api/orders/generate-invoice`| `Order` JSON | `Invoice` JSON | `Bearer` token with scope `invoice:write` |
 
 > *Compatibility:* The main URL is `POST /api/orders/generate-invoice`. The legacy URL
-> `POST /api/pedido/gerarNotaFiscal` remains available as an alias for existing clients.
+> `POST /api/pedido/gerarNotaFiscal` remains available as an alias for existing clients
+> (and is equally protected — see §1.1).
 
 The controller maps the JSON DTO to a domain `Order`, delegates to `GenerateInvoiceUseCase.generateInvoice(order)`, and returns the resulting `Invoice` with HTTP 200. Domain validation failures are returned as HTTP 400 with `codigo` and `mensagem`.
+
+### 1.1 Authentication (F-AUTH)
+
+Mutating endpoints require an HS256 JWT issued by `POST /api/auth/login`. The token's
+`scope` claim must contain `invoice:write`.
+
+Demo users (replace before any real deployment — see
+[`docs/auth-strategy.md`](auth-strategy.md)):
+
+| Username | Password   | Scope                            |
+| -------- | ---------- | -------------------------------- |
+| `demo`   | `demo123`  | `invoice:write`                  |
+| `admin`  | `admin123` | `invoice:write invoice:admin`    |
+
+```bash
+# 1) Log in.
+TOKEN=$(curl -sS -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"demo123"}' \
+  | jq -r .access_token)
+
+# 2) Call the invoice endpoint with the token.
+curl -X POST http://localhost:8080/api/orders/generate-invoice \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d @src/main/resources/payloads/teste-pf.json
+```
+
+Auth-error envelope (same `{codigo, mensagem}` shape used by the rest of the API):
+
+| Scenario                                        | HTTP | `codigo`                |
+| ----------------------------------------------- | ---- | ----------------------- |
+| `POST /auth/login` missing/blank fields         | 400  | `INVALID_LOGIN_PAYLOAD` |
+| `POST /auth/login` wrong password / unknown user| 401  | `INVALID_CREDENTIALS`   |
+| Protected endpoint without/with malformed token | 401  | `UNAUTHORIZED`          |
+| Protected endpoint with expired token           | 401  | `UNAUTHORIZED`          |
+| Protected endpoint with token lacking scope     | 403  | `FORBIDDEN`             |
+
+Public endpoints (no token required): `POST /api/auth/login`, `GET /actuator/health`,
+`GET /actuator/health/**`, `GET /actuator/info`, `GET /actuator/prometheus` (the
+F-OBSERVABILITY Prometheus scrape contract is preserved).
 
 ---
 
