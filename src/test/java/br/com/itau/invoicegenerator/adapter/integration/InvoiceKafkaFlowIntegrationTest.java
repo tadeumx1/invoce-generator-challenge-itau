@@ -10,6 +10,7 @@ import br.com.itau.invoicegenerator.domain.port.AccountsReceivablePort;
 import br.com.itau.invoicegenerator.domain.port.DeliveryPort;
 import br.com.itau.invoicegenerator.domain.port.InvoiceRegistrationPort;
 import br.com.itau.invoicegenerator.domain.port.StockPort;
+import br.com.itau.invoicegenerator.testsupport.JwtTestSupport;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -22,6 +23,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
@@ -47,7 +49,7 @@ import org.springframework.util.StreamUtils;
       InvoiceTopics.DELIVERY_SCHEDULING,
       InvoiceTopics.ACCOUNTS_RECEIVABLE
     })
-@Import(InvoiceKafkaFlowIntegrationTest.RecordingPortsConfig.class)
+@Import({InvoiceKafkaFlowIntegrationTest.RecordingPortsConfig.class, JwtTestSupport.class})
 @TestPropertySource(
     properties = {
       "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
@@ -58,6 +60,7 @@ class InvoiceKafkaFlowIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
   @Autowired private RecordingPorts recordingPorts;
+  @Autowired private JwtTestSupport jwt;
 
   @Test
   void postPublishesFourEventsAndConsumersReceiveThem() throws Exception {
@@ -67,6 +70,8 @@ class InvoiceKafkaFlowIntegrationTest {
     mockMvc
         .perform(
             post("/api/orders/generate-invoice")
+                .header(
+                    HttpHeaders.AUTHORIZATION, "Bearer " + jwt.tokenFor("demo", "invoice:write"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk());

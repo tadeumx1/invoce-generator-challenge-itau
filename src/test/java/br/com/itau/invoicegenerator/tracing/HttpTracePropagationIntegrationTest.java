@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.itau.invoicegenerator.adapter.observability.CorrelationIdFilter;
 import br.com.itau.invoicegenerator.adapter.observability.UseCaseObservation;
+import br.com.itau.invoicegenerator.testsupport.JwtTestSupport;
 import br.com.itau.invoicegenerator.testsupport.NoOpKafkaTestConfig;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
@@ -24,6 +25,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
@@ -48,7 +50,7 @@ import org.springframework.util.StreamUtils;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
-@Import(NoOpKafkaTestConfig.class)
+@Import({NoOpKafkaTestConfig.class, JwtTestSupport.class})
 @TestPropertySource(
     properties = {
       "app.messaging.kafka.enabled=false",
@@ -58,6 +60,7 @@ class HttpTracePropagationIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObservationRegistry observationRegistry;
+  @Autowired private JwtTestSupport jwt;
 
   private MdcSnapshotHandler snapshotHandler;
 
@@ -75,6 +78,8 @@ class HttpTracePropagationIntegrationTest {
         .perform(
             post("/api/orders/generate-invoice")
                 .header(CorrelationIdFilter.HEADER_NAME, "probe-trace")
+                .header(
+                    HttpHeaders.AUTHORIZATION, "Bearer " + jwt.tokenFor("demo", "invoice:write"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk())

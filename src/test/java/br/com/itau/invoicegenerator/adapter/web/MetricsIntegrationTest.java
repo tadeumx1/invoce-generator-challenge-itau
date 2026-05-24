@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.itau.invoicegenerator.testsupport.JwtTestSupport;
 import br.com.itau.invoicegenerator.testsupport.NoOpKafkaTestConfig;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
@@ -28,7 +30,7 @@ import org.springframework.util.StreamUtils;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
-@Import(NoOpKafkaTestConfig.class)
+@Import({NoOpKafkaTestConfig.class, JwtTestSupport.class})
 @TestPropertySource(
     properties = {
       "app.messaging.kafka.enabled=false",
@@ -37,6 +39,11 @@ import org.springframework.util.StreamUtils;
 class MetricsIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
+  @Autowired private JwtTestSupport jwt;
+
+  private String bearerToken() {
+    return "Bearer " + jwt.tokenFor("demo", "invoice:write");
+  }
 
   @Test
   void successfulPostIncrementsInvoiceGeneratedCounter() throws Exception {
@@ -45,6 +52,7 @@ class MetricsIntegrationTest {
     mockMvc
         .perform(
             post("/api/orders/generate-invoice")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk());
@@ -70,6 +78,7 @@ class MetricsIntegrationTest {
     mockMvc
         .perform(
             post("/api/orders/generate-invoice")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isBadRequest());
@@ -93,6 +102,7 @@ class MetricsIntegrationTest {
     mockMvc
         .perform(
             post("/api/orders/generate-invoice")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk());
