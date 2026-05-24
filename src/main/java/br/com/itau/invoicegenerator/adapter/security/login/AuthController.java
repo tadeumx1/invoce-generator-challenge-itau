@@ -1,0 +1,33 @@
+package br.com.itau.invoicegenerator.adapter.security.login;
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * F-AUTH — issues JWTs for the two demo users. Public endpoint by definition: T3 wires {@code
+ * .requestMatchers(POST, "/api/auth/login").permitAll()} on the filter chain.
+ */
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+  private final JwtIssuer jwtIssuer;
+
+  public AuthController(JwtIssuer jwtIssuer) {
+    this.jwtIssuer = jwtIssuer;
+  }
+
+  @PostMapping("/login")
+  public LoginResponse login(@RequestBody(required = false) LoginRequest request) {
+    if (request == null || isBlank(request.username()) || isBlank(request.password())) {
+      throw new InvalidLoginPayloadException("username and password are required");
+    }
+    return jwtIssuer.issueToken(request.username(), request.password());
+  }
+
+  private static boolean isBlank(String s) {
+    return s == null || s.isBlank();
+  }
+}
