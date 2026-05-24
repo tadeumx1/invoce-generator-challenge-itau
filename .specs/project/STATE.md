@@ -397,6 +397,13 @@ None.
 **Solution:** Verified by running the test in isolation (passes) and re-reading the original `CalculadoraAliquotaProduto` (identical static pattern). Captured as the defining example of C-1.
 **Prevents:** Mistaking pre-existing bugs for rename regressions; always re-verify the pre-rename behavior before claiming regression.
 
+### L-004: TESTING.md is the SSOT for both Maven + Newman + Docker workflows (2026-05-24)
+
+**Context:** After F-AUTH T6 the Newman pipeline + the `KAFKA_BOOTSTRAP_SERVERS=localhost:29092` env-var override + the `docker compose up -d kafka` recipe lived only in the AI's working memory and the relevant commit messages. A new contributor running through the test docs would not have found them.
+**Problem:** A green `./mvnw verify` is no longer the whole story — F-POSTMAN ships a Newman collection; F-AUTH locks the protected endpoints behind a JWT that the auto-login Pre-request script issues; the happy-path requests need a reachable Kafka broker. Three failure modes (401 on first request, 500 on happy-path only, ECONNREFUSED) each have a specific cause that is invisible from `./mvnw test`.
+**Solution:** Rewrite `.specs/codebase/TESTING.md` (commit `aab0379`, 2026-05-24) as the single source of truth: class-by-class table of all 103 tests with feature attribution, Newman recipes for both full-compose and local-app + compose-Kafka, the 2026-05-24 verified-run table (8 requests / 24 assertions / 0 failures / 993 ms), auto-login Pre-request script behaviour, failure-mode diagnostics. Everything else (READMEs, business-rules) links to TESTING.md rather than duplicating the recipe.
+**Prevents:** Recipe drift across READMEs / CLAUDE.md / specs. Newman-specific failure modes silently turning into "the app is broken" tickets. Future Kafka-bootstrap overrides being rediscovered every time someone tries to run the Postman collection locally.
+
 ---
 
 ## Quick Tasks Completed
@@ -427,6 +434,13 @@ None.
 | 022 | F-DEFECTS-PERFORMANCE T5 — docs cross-link, ROADMAP/STATE/CONCERNS update, final verify | 2026-05-23 | (HEAD) | ✅ Done |
 | 023 | F-RESILIENCE T1 — Resilience4j circuit breakers on 4 outbound adapters; C-8 interrupt-flag fix; CircuitBreakerLifecycleTest | 2026-05-23 | (HEAD) | ✅ Done |
 | 024 | F-RESILIENCE T2 — docs closure (ROADMAP/STATE/CONCERNS/CLAUDE) | 2026-05-23 | (HEAD) | ✅ Done |
+| 025 | F-AUTH T1 — Spring Security + HS256 JwtEncoder/JwtDecoder beans + permissive chain | 2026-05-24 | `7b3819b` | ✅ Done |
+| 026 | F-AUTH T2 — POST /api/auth/login + JwtIssuer + InMemoryUserStore (2 BCrypt users) + error mappings | 2026-05-24 | `3dce9ec` | ✅ Done |
+| 027 | F-AUTH T3+T4 — lock down invoice endpoints + JwtTestSupport on 4 existing integration tests | 2026-05-24 | `4f087d5` | ✅ Done |
+| 028 | F-AUTH T5 — AuthControllerIntegrationTest (6) + SecurityIntegrationTest (9) | 2026-05-24 | `175fc30` | ✅ Done |
+| 029 | F-AUTH T6 — ROADMAP M4 + STATE AD-032 + Postman auto-login + README/CHALLENGE/CLAUDE/business-rules/auth-strategy | 2026-05-24 | `a0c4b95` | ✅ Done |
+| 030 | F-AUTH validation — Newman 24/24 assertions green against docker-compose Kafka + local app (993 ms) | 2026-05-24 | (verified, no commit) | ✅ Done |
+| 031 | TESTING.md rewrite — class-by-class 103-test table + Newman recipes + docker compose commands + failure-mode diagnostics + L-004 | 2026-05-24 | `aab0379` | ✅ Done |
 
 > Commits are pending — none of the above is in git yet beyond the initial commit `0780ce3`. To be staged when the user asks.
 

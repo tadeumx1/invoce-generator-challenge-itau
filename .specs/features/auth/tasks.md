@@ -1,7 +1,7 @@
 # F-AUTH Tasks
 
 **Spec:** [`spec.md`](spec.md) · **Design:** [`design.md`](design.md)
-**Status:** In progress
+**Status:** Done (2026-05-24)
 **Granularity policy:** 6 consolidated vertical slices, per user preference
 (see [[feedback_task-granularity]]). Each slice is one atomic commit.
 
@@ -266,13 +266,21 @@ convention in STATE.md.
 
 **Done when:**
 
-- [ ] `npx newman run docs/postman/invoice-generator.postman_collection.json` green
+- [x] `npx newman run docs/postman/invoice-generator.postman_collection.json` green
       end-to-end (Pre-request script auto-logs-in; all assertions pass).
-- [ ] `grep -r "ADR-031" docs/ .specs/` returns no stale auth references (sanity).
-- [ ] ROADMAP shows M4 with F-AUTH ✅.
-- [ ] STATE shows AD-032 with all four design decisions recorded.
-- [ ] CLAUDE.md curl example reflects the protected endpoint (or links to README's
+      **Verified 2026-05-24:** 8 requests, 24/24 assertions, 0 failures, 993 ms
+      total run duration. Run against `docker compose up -d kafka` +
+      `KAFKA_BOOTSTRAP_SERVERS=localhost:29092 ./mvnw spring-boot:run`. Recipe and
+      last-run table are in [`.specs/codebase/TESTING.md`](../../codebase/TESTING.md).
+- [x] `grep -r "ADR-031" docs/ .specs/` returns no stale auth references (sanity).
+- [x] ROADMAP shows M4 with F-AUTH ✅.
+- [x] STATE shows AD-032 with all four design decisions recorded.
+- [x] CLAUDE.md curl example reflects the protected endpoint (or links to README's
       two-step flow).
+- [x] `.specs/codebase/TESTING.md` is the SSOT for the Newman + docker workflows
+      (commit `aab0379`, 2026-05-24): class-by-class table of the 103 tests, Newman
+      recipes (full-compose and local-app + compose-Kafka), last verified run table,
+      auto-login Pre-request script behaviour, failure-mode diagnostics.
 
 **Tests:** none new (docs).
 **Gate:** `npx newman run docs/postman/invoice-generator.postman_collection.json`.
