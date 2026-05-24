@@ -93,6 +93,16 @@ public class SecurityConfig {
                         "/actuator/info",
                         "/actuator/prometheus")
                     .permitAll()
+                    // F-API-DOCS — OpenAPI 3 document + Swagger UI are reviewer-facing surfaces.
+                    // F-RATELIMIT already does not throttle them (they live outside /api/**).
+                    .requestMatchers(
+                        "/v3/api-docs",
+                        "/v3/api-docs/**",
+                        "/v3/api-docs.yaml",
+                        "/swagger-ui",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html")
+                    .permitAll()
                     .requestMatchers(
                         HttpMethod.POST,
                         "/api/orders/generate-invoice",

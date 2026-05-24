@@ -5,6 +5,7 @@ import br.com.itau.invoicegenerator.adapter.security.login.InvalidCredentialsExc
 import br.com.itau.invoicegenerator.adapter.security.login.InvalidLoginPayloadException;
 import br.com.itau.invoicegenerator.adapter.web.dto.ErrorResponseDto;
 import br.com.itau.invoicegenerator.domain.exception.InvalidInvoiceOrderException;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -39,5 +40,21 @@ public class ApiExceptionHandler {
       InvalidLoginPayloadException exception) {
     ErrorResponseDto body = new ErrorResponseDto("INVALID_LOGIN_PAYLOAD", exception.getMessage());
     return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+  }
+
+  /**
+   * F-RATELIMIT T3 — defence-in-depth. The primary 429 path is {@code RateLimitFilter} writing the
+   * envelope directly (filter-level rejections never reach {@code DispatcherServlet}). This handler
+   * covers any future code that uses {@code @RateLimiter} annotations on controller methods (the
+   * AOP path throws {@link RequestNotPermitted}) and emits the same envelope so clients see one
+   * contract regardless of which mechanism throttled them.
+   */
+  @ExceptionHandler(RequestNotPermitted.class)
+  public ResponseEntity<ErrorResponseDto> handleRequestNotPermitted(RequestNotPermitted exception) {
+    ErrorResponseDto body =
+        new ErrorResponseDto(
+            "RATE_LIMIT_EXCEEDED",
+            "Limite de requisicoes excedido. Tente novamente em alguns instantes.");
+    return new ResponseEntity<>(body, HttpStatus.TOO_MANY_REQUESTS);
   }
 }

@@ -3,6 +3,7 @@ package br.com.itau.invoicegenerator.adapter.integration.registration;
 import br.com.itau.invoicegenerator.adapter.integration.IntegrationAdapterException;
 import br.com.itau.invoicegenerator.domain.model.Invoice;
 import br.com.itau.invoicegenerator.domain.port.InvoiceRegistrationPort;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ public class InvoiceRegistrationAdapter implements InvoiceRegistrationPort {
 
   @Override
   @CircuitBreaker(name = CIRCUIT_BREAKER_NAME)
+  @Bulkhead(name = CIRCUIT_BREAKER_NAME)
   public void registerInvoice(Invoice invoice) {
     try {
       // Simulates registering the invoice with the registry.

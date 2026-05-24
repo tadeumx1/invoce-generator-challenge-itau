@@ -2,6 +2,7 @@ package br.com.itau.invoicegenerator.adapter.security.ratelimit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -53,5 +54,16 @@ public class RateLimitConfig {
     FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
     registration.setEnabled(false);
     return registration;
+  }
+
+  /**
+   * Install the {@link RateLimiterMeterFilter} cardinality guard on every Micrometer registry that
+   * appears in the context — keeps per-(group, ip) synthetic instance names from publishing meters
+   * (AD-RLIM-2 + AD-020).
+   */
+  @Bean
+  public MeterRegistryCustomizer<io.micrometer.core.instrument.MeterRegistry>
+      rateLimiterMeterCardinalityGuard() {
+    return registry -> registry.config().meterFilter(new RateLimiterMeterFilter());
   }
 }

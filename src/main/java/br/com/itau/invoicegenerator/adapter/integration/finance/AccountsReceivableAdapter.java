@@ -3,6 +3,7 @@ package br.com.itau.invoicegenerator.adapter.integration.finance;
 import br.com.itau.invoicegenerator.adapter.integration.IntegrationAdapterException;
 import br.com.itau.invoicegenerator.domain.model.Invoice;
 import br.com.itau.invoicegenerator.domain.port.AccountsReceivablePort;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ public class AccountsReceivableAdapter implements AccountsReceivablePort {
 
   @Override
   @CircuitBreaker(name = CIRCUIT_BREAKER_NAME)
+  @Bulkhead(name = CIRCUIT_BREAKER_NAME)
   public void sendInvoiceToAccountsReceivable(Invoice invoice) {
     try {
       // Simulates forwarding the invoice to accounts receivable.

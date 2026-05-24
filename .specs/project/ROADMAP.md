@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** M4 — Security & access control (complete)
-**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH).
+**Current Milestone:** M6 — Concurrency back-pressure + DX polish (complete)
+**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH). M5 (F-RATELIMIT) closure tracked under its own spec at `.specs/features/ratelimit/spec.md`. M6 closed (2026-05-24, F-BULKHEAD + F-API-DOCS).
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 

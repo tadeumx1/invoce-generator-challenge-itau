@@ -3,6 +3,7 @@ package br.com.itau.invoicegenerator.adapter.integration.delivery;
 import br.com.itau.invoicegenerator.adapter.integration.IntegrationAdapterException;
 import br.com.itau.invoicegenerator.domain.model.Invoice;
 import br.com.itau.invoicegenerator.domain.port.DeliveryPort;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,7 @@ public class DeliveryIntegrationAdapter implements DeliveryPort {
 
   @Override
   @CircuitBreaker(name = CIRCUIT_BREAKER_NAME)
+  @Bulkhead(name = CIRCUIT_BREAKER_NAME)
   public void scheduleDelivery(Invoice invoice) {
     try {
       // Simulates the delivery scheduling step.

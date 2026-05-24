@@ -11,6 +11,8 @@ import br.com.itau.invoicegenerator.domain.model.Invoice;
 import br.com.itau.invoicegenerator.domain.model.Order;
 import br.com.itau.invoicegenerator.domain.model.Recipient;
 import br.com.itau.invoicegenerator.domain.model.Region;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +34,15 @@ public class InvoiceController {
   }
 
   @PostMapping({"/api/orders/generate-invoice", "/api/pedido/gerarNotaFiscal"})
+  @Operation(
+      summary = "Calculate an invoice and dispatch downstream side effects",
+      description =
+          "Synchronously computes ICMS + freight for the order and publishes four Kafka events"
+              + " (stock deduction, invoice registration, delivery scheduling, accounts"
+              + " receivable). HTTP 200 means \"invoice calculated and dispatch accepted\", NOT"
+              + " \"all downstreams completed\". Requires JWT scope invoice:write."
+              + " /api/pedido/gerarNotaFiscal is the preserved legacy alias.")
+  @SecurityRequirement(name = "bearer-jwt")
   public ResponseEntity<InvoiceDto> generateInvoice(@RequestBody OrderDto request) {
     Order order = webInvoiceMapper.toDomain(request);
     Invoice invoice = useCaseObservation.generate(order);
