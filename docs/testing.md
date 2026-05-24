@@ -50,13 +50,39 @@ JaCoCo runs as part of `./mvnw verify`. The HTML report lands at `target/site/ja
 
 The collection assumes the JWT flow from F-AUTH: the first request is `POST /api/auth/login`, which stores `access_token` on a collection variable and feeds the bearer header on every downstream request. Run it as a whole — picking a single request without the login first will fail with 401.
 
-### Pre-flight: start the service
+### Local Docker stack (full integration environment)
 
-Either form works; pick whichever matches what you want to exercise.
+The fast Maven suite covers the application end-to-end via `@EmbeddedKafka` and MockMvc; no infrastructure required. The Docker stack is for manual exploration, Postman/Newman runs against a live broker, and observability tooling (Prometheus scrape endpoint + Jaeger).
 
 ```bash
-./mvnw spring-boot:run                 # app only — Kafka dispatch is no-oped
-docker compose up --build              # full stack: app + cp-kafka (KRaft) + Jaeger
+docker compose up -d                         # start Kafka + Jaeger + app in background
+docker compose up -d kafka                   # start ONLY Kafka, e.g. when running the app via ./mvnw spring-boot:run locally
+docker compose ps                            # see container status
+docker compose logs -f invoice-generator     # tail app logs
+docker compose down                          # stop and remove all containers + the compose network
+docker compose down -v                       # additionally wipe named volumes, if any are added later
+```
+
+When you bring up only Kafka and run the app locally with `./mvnw spring-boot:run`, point the producer at the external listener:
+
+```bash
+docker compose up -d kafka
+KAFKA_BOOTSTRAP_SERVERS=localhost:29092 ./mvnw spring-boot:run
+```
+
+Ports exposed:
+
+| Component | Port | Purpose |
+| --- | --- | --- |
+| App | `8080` | API, actuator health, metrics, and Prometheus scrape endpoint. |
+| Kafka | `29092` | External listener for host tools and a locally run app. |
+| Jaeger | `16686` | Trace UI. |
+| Jaeger OTLP | `4318` | OTLP HTTP receiver used by the app container. |
+
+For an app-only run without Docker infrastructure:
+
+```bash
+./mvnw spring-boot:run
 ```
 
 Wait for the actuator health endpoint to come up before launching Newman:
