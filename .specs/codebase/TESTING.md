@@ -139,11 +139,17 @@ Health-checks built into the compose file: Kafka has a `kafka-broker-api-version
 | `adapter.integration.CircuitBreakerLifecycleTest` | 1 | F-RESILIENCE |
 | `adapter.messaging.IdempotencyStoreTest` | 4 | F-DEFECTS-PERFORMANCE |
 | `adapter.messaging.KafkaInvoiceSideEffectDispatcherTest` | 3 | F-DEFECTS-PERFORMANCE |
-| `adapter.security.AuthControllerIntegrationTest` | 6 | F-AUTH (login flow) |
+| `adapter.security.AuthControllerIntegrationTest` | 6 | F-AUTH (login flow) — uses `@TestPropertySource` to raise `auth-login.limit-for-period` so the 6 login calls don't trip prod's 5/min ceiling |
 | `adapter.security.SecurityIntegrationTest` | 9 | F-AUTH (filter chain) |
+| `adapter.security.ratelimit.ClientIpResolverTest` | 8 | F-RATELIMIT (IP resolver — XFF first-hop, fallback, unknown sentinel) |
+| `adapter.security.ratelimit.RateLimitPolicyTest` | 12 | F-RATELIMIT (URI→group mapping, actuator exempt, alias shares bucket) |
+| `adapter.security.ratelimit.RateLimitIntegrationTest` | 6 | F-RATELIMIT (real chain: trip at 4th, per-IP isolation, actuator never throttled at 30×, alias shares bucket, OPTIONS preflight bypass, malformed XFF) |
+| `adapter.security.ratelimit.RateLimitMetricsIntegrationTest` | 2 | F-RATELIMIT (Prometheus scrape: `name="auth-login"` meter present + no per-IP synthetic name leak) |
+| `adapter.integration.BulkheadEnforcementTest` | 2 | F-BULKHEAD (semaphore exhaustion) |
+| `adapter.web.OpenApiDocsIntegrationTest` | 4 | F-API-DOCS (`/v3/api-docs` reachable anonymously, declares `bearer-jwt`, surfaces three productive paths, Swagger UI reachable) |
 | `InvoiceGeneratorApplicationTests` | 1 | Context smoke |
 
-Class counts above approximate `@Test` + `@ParameterizedTest` matrices; the authoritative total (103) is reported by Surefire.
+Class counts above approximate `@Test` + `@ParameterizedTest` matrices; the authoritative total (137) is reported by Surefire.
 
 ### Slow profile — `./mvnw test -Pslow`
 
@@ -153,7 +159,7 @@ Class counts above approximate `@Test` + `@ParameterizedTest` matrices; the auth
 
 ### `./mvnw verify`
 
-Adds Spotless format check, Checkstyle, jar packaging, and JaCoCo HTML report on top of `./mvnw test`. Same 103 tests; total ~45 s.
+Adds Spotless format check, Checkstyle, jar packaging, and JaCoCo HTML report on top of `./mvnw test`. Same 137 tests; total ~50 s.
 
 ---
 
@@ -199,30 +205,33 @@ npx newman run docs/postman/invoice-generator.postman_collection.json \
   --env-var baseUrl=https://invoice.example.com
 ```
 
-### Last verified run (2026-05-24)
+### Last verified run (2026-05-24, post-F-RATELIMIT)
 
-Against `docker compose up -d` + the F-AUTH-enabled app:
+Against `docker compose up -d kafka` + local app on port 8080 (Newman 6.x via `npx --yes newman`):
 
 ```
 ┌─────────────────────────┬────────────────────┬───────────────────┐
 │                         │           executed │            failed │
 ├─────────────────────────┼────────────────────┼───────────────────┤
 │              iterations │                  1 │                 0 │
-│                requests │                  8 │                 0 │
-│            test-scripts │                  8 │                 0 │
-│      prerequest-scripts │                  8 │                 0 │
-│              assertions │                 24 │                 0 │
+│                requests │                 14 │                 0 │
+│            test-scripts │                  9 │                 0 │
+│      prerequest-scripts │                 10 │                 0 │
+│              assertions │                 27 │                 0 │
 ├─────────────────────────┴────────────────────┴───────────────────┤
-│ total run duration: 993ms                                        │
-│ total data received: 2.35kB (approx)                             │
-│ average response time: 100ms [min: 9ms, max: 340ms, s.d.: 120ms] │
+│ total run duration: 2.1s                                         │
+│ total data received: 3.86kB (approx)                             │
+│ average response time: 122ms [min: 8ms, max: 408ms, s.d.: 120ms] │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+The 14 requests = 9 main collection requests + 5 priming requests issued by the F-RATELIMIT test's pre-request script (which depletes the `auth-login` bucket for `X-Forwarded-For=10.99.0.1` before the main 6th request).
 
 | Folder | Request | HTTP | Assertions | Notes |
 | --- | --- | --- | --- | --- |
 | **Auth** | `POST /api/auth/login` — demo user | 200 | 3 | Returns three-segment JWT; `token_type=Bearer`; `expires_in > 0`; `scope` contains `invoice:write`. Stores `access_token` on collection variable. |
 | **Auth** | `POST /api/auth/login` — wrong password | 401 | 2 | `codigo=INVALID_CREDENTIALS`, `mensagem` populated. |
+| **Auth** | `POST /api/auth/login` — RATE_LIMIT_EXCEEDED on 6th attempt | 429 | 3 | F-RATELIMIT proof. Pre-request primes the bucket with 5 sequential POSTs from `X-Forwarded-For=10.99.0.1`; main 6th request asserts `codigo=RATE_LIMIT_EXCEEDED`, `Retry-After` is a positive integer. |
 | **Happy paths** | `POST /api/orders/generate-invoice` — FISICA (`teste-pf.json`) | 200 | 6 | Snake_case Portuguese keys present; FISICA totalItemsValue=100 < 500 → tax = 0; SUDESTE freight = 10.0 × 1.048 = 10.48; echoes `X-Correlation-Id`. |
 | **Happy paths** | `POST /api/orders/generate-invoice` — JURIDICA SIMPLES_NACIONAL (`teste-pj-simples.json`) | 200 | 5 | JURIDICA SIMPLES totalItemsValue=5840 > 5000 → rate 0.19 → tax = 138.7; SUDESTE freight = 72 × 1.048 = 75.46 (HALF_EVEN scale 2); no English keys leak into response. |
 | **Happy paths** | `POST /api/pedido/gerarNotaFiscal` — legacy alias | 200 | 2 | Same contract as the canonical endpoint. |

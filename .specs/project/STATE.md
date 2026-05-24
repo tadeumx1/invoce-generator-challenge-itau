@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-24
-**Current Work:** All ten roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-DEPLOY-ACTION, F-AUTH). 103 fast tests passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean; `.github/workflows/deploy-aws.yml` provides the proposal-grade GitHub Actions deploy pipeline (commented triggers, OIDC); F-AUTH adds demo-grade JWT auth with `POST /api/auth/login` + Spring Security 6 resource server protecting the invoice endpoints. M3 and M4 milestones closed.
+**Current Work:** M5 closed (F-RATELIMIT + F-BULKHEAD + F-API-DOCS). All thirteen roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-DEPLOY-ACTION, F-AUTH, F-RATELIMIT, F-BULKHEAD, F-API-DOCS). 137 fast tests passing; Newman 14 requests / 27 assertions / 0 failures including the new F-RATELIMIT 429 proof. `docs/observability.md` is the operator SSOT for observability, `docs/bulkhead-strategy.md` is the operator SSOT for bulkhead calibration, `docs/aws-architecture.md` is the reviewer-facing AWS proposal. F-RATELIMIT adds per-IP rate limiting via `resilience4j-ratelimiter` (auth-login 5/min, invoice-generate 30/min, default 60/min; actuator exempt) wired via `OncePerRequestFilter` in the existing `SecurityFilterChain`; F-BULKHEAD adds semaphore bulkheads on the four outbound adapters (delivery=5, others=20, fail-fast); F-API-DOCS exposes Swagger UI at `/swagger-ui.html` documenting the JWT bearer flow.
 
 ---
 
@@ -357,6 +357,179 @@ must agree, audited at T5 before flipping ROADMAP to COMPLETE.
 **Trade-off:** CDK lets us colocate infra with the Java app and reuse types; Terraform requires duplicating naming conventions in HCL.
 **Impact:** F-AWS plans Terraform modules under `infra/terraform/`. If user prefers CDK before F-AWS starts, revisit this ADR.
 
+### AD-033: F-BULKHEAD scope — semaphore variant, per-adapter not global, calibrated `delivery=5 / others=20`, fail-fast (2026-05-24)
+
+**Decision:** F-BULKHEAD ships **semaphore bulkheads** on the four outbound adapters that already
+carry the F-RESILIENCE circuit breaker. Four sub-decisions freeze the implementation:
+
+1. **`SEMAPHORE` variant**, not `THREADPOOL`. The threadpool variant forces every adapter
+   to return `CompletableFuture<T>`, which would propagate through ports and the use case —
+   exactly the trade-off AD-027 rejected for `@TimeLimiter`. The semaphore variant is a
+   counter around the existing synchronous call, with zero signature changes.
+2. **One bulkhead per adapter**, not a single global one. A slow adapter (delivery,
+   `Thread.sleep(5000)`) must not be allowed to starve permits a fast adapter (stock,
+   `Thread.sleep(380)`) could have used. Watertight compartments, like the metaphor name implies.
+3. **Calibration option A: `deliveryPort.max-concurrent-calls=5`, the other three at `20`.**
+   Delivery is intentionally tighter because its 5-second simulated latency means each in-flight
+   call holds its permit for 5 seconds; a high ceiling there would authorise the system to start
+   a large number of slow operations in parallel. Rationale frozen in `docs/bulkhead-strategy.md`
+   §4-5.
+4. **`max-wait-duration=0` everywhere — fail-fast.** A permit-exhausted call is rejected
+   immediately with `BulkheadFullException` instead of blocking the consumer thread waiting for
+   a refill. Rejected calls bubble to `@RetryableTopic` (the existing retry path); blocking
+   would defeat the back-pressure point.
+
+**Reason:** After F-RESILIENCE the four adapters were protected against *failures* (CB reacts
+to a 50% failure rate). They had no protection against *concurrency*: a future
+`@KafkaListener(concurrency=N)` bump or a runaway producer could fan out unbounded parallel
+calls before the circuit breaker even saw the first failure. The bulkhead is the missing
+pre-failure guardrail. Combined with F-RATELIMIT (request-rate at the HTTP boundary) and
+F-RESILIENCE (failure-rate on outbound), it closes the three independent back-pressure axes.
+
+**Trade-off:** The numbers were not derived from a load test — they are insurance against
+foreseeable concurrency bumps, not throughput tuning. Today, the listener concurrency is `1`
+per consumer; the bulkhead sits near-empty in steady state. Numbers are tunable in
+`application.properties` per environment without code changes. The semaphore-only choice means
+no per-call timeout — pathological adapters (real downstream hung forever) would still hold the
+consumer thread until the broker session times out. That gap is documented in AD-027 and
+unchanged by AD-033.
+
+**Impact:** Four `@Bulkhead(name=...)` annotations added alongside the existing
+`@CircuitBreaker`. Four properties blocks added under `resilience4j.bulkhead.instances.*` in
+`application.properties`. New `BulkheadEnforcementTest` (2 tests, programmatic Resilience4j —
+same pragmatic shape as `CircuitBreakerLifecycleTest`). New operator-facing doc
+`docs/bulkhead-strategy.md` with the supermarket-checkout analogy + calibration table +
+decision log. `resilience4j-micrometer` auto-publishes the two bulkhead meters on
+`/actuator/prometheus` with no extra collector code. F-OBSERVABILITY's cardinality budget
+(AD-020) is preserved — `name` is the only tag, bounded to the four instance names.
+
+### AD-034: F-API-DOCS scope — springdoc-openapi 2.8.x, light annotation level, docs surface `permitAll` + rate-limit-exempt, no DTO `@Schema(description)` (2026-05-24)
+
+**Decision:** F-API-DOCS ships **`org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13`**
+(the line compatible with Spring Boot 3.5.14 / Spring 6.2 `ControllerAdviceBean` API; the 2.6.x
+line proved incompatible with a `NoSuchMethodError` at runtime). Four sub-decisions freeze the
+implementation:
+
+1. **springdoc over Springfox.** Springfox is EOL since 2020; springdoc is the de-facto Spring
+   Boot 3 OpenAPI 3 generator in 2026. Single starter brings spec generation + Swagger UI.
+2. **Light annotation level.** `OpenAPIConfig` declares the info block + server URL + the
+   `bearer-jwt` HTTP security scheme; `@Operation(summary, description)` + `@SecurityRequirement`
+   on the three productive endpoints. **No DTO `@Schema(description=...)` annotations** —
+   `docs/business-rules.md` is the SSOT for field meaning and per-field docs scattered across
+   DTO files rot the moment business rules evolve.
+3. **Docs surface `permitAll` + F-RATELIMIT-exempt.** `/v3/api-docs/**`, `/v3/api-docs.yaml`,
+   `/swagger-ui/**`, `/swagger-ui.html` are added to `SecurityConfig.permitAll`. F-RATELIMIT
+   already does not throttle them (they live outside `/api/**`, falling through `RateLimitPolicy`
+   to the implicit-exempt `null` group). Docs behind auth is a non-feature; a reviewer must be
+   able to `curl http://localhost:8080/swagger-ui.html` from a fresh checkout.
+4. **`bearer-jwt` document-level + `@SecurityRequirements({})` override on the login endpoint.**
+   The OpenAPI document declares one security scheme (HTTP, `scheme=bearer`, `bearerFormat=JWT`)
+   and applies it at the document level. `AuthController.login` opts out so Swagger UI can call
+   it without a token (chicken-and-egg — the endpoint *issues* tokens). The override is the
+   documented OpenAPI 3 pattern.
+
+**Reason:** The challenge currently surfaces three endpoints through `README.md` `curl`
+snippets, `docs/auth-strategy.md` prose, and the Newman collection. None is machine-readable
+or interactive. springdoc adds an OpenAPI 3 JSON document at `/v3/api-docs` (consumable by
+Postman import, OpenAPI Generator, AWS API Gateway integrations) and a Swagger UI at
+`/swagger-ui.html` (interactive "Try it out"). The diff is minimal — one dependency, one
+`@Configuration` bean, three method-level annotations, six `permitAll` patterns — and the
+reviewer-experience win is large.
+
+**Trade-off:** A working Swagger UI on `:8080` is a docs surface that production deployments
+will want to either disable (`springdoc.swagger-ui.enabled=false`) or move behind an internal
+gateway. The current `permitAll` is correct for the demo and explicitly documented as such.
+The light annotation level means request/response bodies are inferred from DTO shapes —
+operations show the `OrderDto` / `InvoiceDto` field tree but not per-field "this is the recipient's
+person type, FISICA or JURIDICA" prose. That is the trade-off against rot; readers who want
+field semantics follow the link to `docs/business-rules.md`.
+
+**Impact:** New `OpenAPIConfig` `@Configuration` class under `adapter/web/`. Six new
+`permitAll` patterns in `SecurityConfig`. `@Operation` + `@SecurityRequirements` on
+`AuthController.login`; `@Operation` + `@SecurityRequirement` on
+`InvoiceController.generateInvoice`. `pom.xml` gains
+`springdoc-openapi-starter-webmvc-ui:2.8.13`. New `OpenApiDocsIntegrationTest` (4 tests:
+`/v3/api-docs` reachable anonymously, declares `bearer-jwt`, surfaces the three productive
+paths, Swagger UI reachable). Total fast test count grows from 133 (post-F-RATELIMIT) to 137.
+`docs/bulkhead-strategy.md` references the AD-033 / AD-034 pair via the M5 milestone.
+
+### AD-035: F-RATELIMIT scope — `resilience4j-ratelimiter`, per-IP buckets via synthesised instances, `Filter`-in-SecurityFilterChain seam, `{codigo, mensagem}` + `Retry-After` envelope (2026-05-24)
+
+**Decision:** F-RATELIMIT ships **per-IP rate limiting via `io.github.resilience4j:resilience4j-ratelimiter`**
+(transitively present through the AD-026 `resilience4j-spring-boot3` starter — no new
+Maven coordinate). Five sub-decisions freeze the implementation:
+
+1. **Library = `resilience4j-ratelimiter`.** Reuses the same property namespace
+   (`resilience4j.*`) and the same `resilience4j-micrometer` binding the four
+   circuit breakers already use; one less third-party dependency to audit.
+2. **Coverage = per-endpoint groups + actuator exempt.** Three statically-named
+   instances configured in `application.properties`: `auth-login` (5/min,
+   brute-force defence on `POST /api/auth/login`), `invoice-generate` (30/min,
+   shared by canonical + legacy alias), `default` (60/min, catch-all so any
+   future `/api/**` endpoint inherits a limit). `/actuator/**` is **exempt** —
+   throttling the Prometheus scrape (every 15s) or k8s liveness probes would
+   break F-OBSERVABILITY's scrape contract (AUTH-15) and trigger restart loops.
+3. **Key = per-IP with `X-Forwarded-For` fallback.** `ClientIpResolver` prefers
+   the leftmost `X-Forwarded-For` hop, falls back to
+   `HttpServletRequest.getRemoteAddr()`, and returns the literal `"unknown"`
+   sentinel for degenerate inputs (filter never throws). Per-IP isolation is
+   achieved by synthesising a per-`(group, ip)` `RateLimiter` via
+   `registry.rateLimiter(name, prototype.getRateLimiterConfig())` — Resilience4j
+   has no built-in key extractor.
+4. **Seam = `OncePerRequestFilter` in `SecurityFilterChain`, `addFilterBefore(...,
+   BearerTokenAuthenticationFilter.class)`.** Rejected the `@RateLimiter`
+   annotation approach (runs *after* the filter chain — abuse traffic pays the
+   BCrypt + JWT validation cost first; URI-to-instance mapping would scatter
+   across controllers instead of centralising in `RateLimitPolicy`).
+5. **Envelope = `{"codigo":"RATE_LIMIT_EXCEEDED","mensagem":"..."}` + `Retry-After`.**
+   `RateLimitErrorWriter` writes the envelope directly because filter-level
+   rejections never reach `DispatcherServlet` (so `@RestControllerAdvice` cannot
+   intercept them). `Retry-After` is the integer ceiling of the configured
+   `limit-refresh-period` — the next *guaranteed* refill window. The literal
+   string `"RATE_LIMIT_EXCEEDED"` is used directly (not added to the
+   `RejectionCode` enum, which is bound to the invoice-domain `invoice.rejected{reason}`
+   counter's cardinality budget — same precedent as F-AUTH's
+   `INVALID_CREDENTIALS` string).
+
+**Reason:** The user heard the recommendation `/api/auth/login` (the only path
+the original `ROADMAP.md` Future Considerations explicitly mentioned) and chose
+to extend coverage to every `/api/**` endpoint with per-endpoint groups. Reusing
+Resilience4j keeps the resilience stack consolidated (one library for circuit
+breakers + bulkheads + rate limiters); `resilience4j-micrometer` ships
+`resilience4j.ratelimiter.*` meters for free.
+
+**Trade-off:** Three implementation realities the spec and `docs/business-rules.md`
+flag explicitly:
+
+- **In-process registry.** Per-IP `RateLimiter` instances live in a process-local
+  `ConcurrentHashMap` with no TTL eviction. Acceptable for the demo (one ECS
+  task); production scaling to N tasks needs a distributed store (Redis /
+  ElastiCache) so the effective per-IP rate stays at `N × limit-for-period`. The
+  trade is documented under RLIM-OOS-3 + Future Considerations.
+- **Cardinality risk.** The synthetic per-IP instance names would publish one
+  Micrometer time-series per unique IP via `TaggedRateLimiterMetrics`, directly
+  violating AD-020. **`RateLimiterMeterFilter` mitigates this** by denying any
+  `resilience4j.ratelimiter.*` meter whose `name` tag is not one of the three
+  statically-named instances. `RateLimitMetricsIntegrationTest` proves the guard
+  via a scrape-based regex check for `:` in the `name` tag.
+- **`Retry-After` is conservative.** Resilience4j fixed-window does not expose
+  the exact wait time cleanly; the ceiling of `limit-refresh-period` is honest
+  about the next *guaranteed* refill rather than approximating the precise wait.
+
+**Impact:** New `adapter/security/ratelimit/` package (6 files):
+`RateLimitConfig`, `RateLimitFilter`, `RateLimitPolicy`, `ClientIpResolver`,
+`RateLimitErrorWriter`, `RateLimiterMeterFilter`. `SecurityConfig.securityFilterChain`
+gains one line (`addFilterBefore`). `ApiExceptionHandler` gains
+`@ExceptionHandler(RequestNotPermitted.class)` as defence-in-depth. `application.properties`
+gains the `resilience4j.ratelimiter.instances.{auth-login, invoice-generate, default}.*`
+block. `AuthControllerIntegrationTest` raises the test-profile limit via
+`@TestPropertySource` so its six login calls don't trip prod's 5/min ceiling.
+20 new tests across 4 classes (`ClientIpResolverTest` 8 + `RateLimitPolicyTest` 12 +
+`RateLimitIntegrationTest` 6 + `RateLimitMetricsIntegrationTest` 2); total fast
+test count `103 -> 131` (M5/RATELIMIT) `-> 137` (M5/BULKHEAD+API-DOCS). Postman
+collection gains the `RATE_LIMIT_EXCEEDED on 6th attempt` request; Newman last
+run = `14 requests / 27 assertions / 0 failures / 2.1s`.
+
 ---
 
 ## Active Blockers
@@ -441,6 +614,11 @@ None.
 | 029 | F-AUTH T6 — ROADMAP M4 + STATE AD-032 + Postman auto-login + README/CHALLENGE/CLAUDE/business-rules/auth-strategy | 2026-05-24 | `a0c4b95` | ✅ Done |
 | 030 | F-AUTH validation — Newman 24/24 assertions green against docker-compose Kafka + local app (993 ms) | 2026-05-24 | (verified, no commit) | ✅ Done |
 | 031 | TESTING.md rewrite — class-by-class 103-test table + Newman recipes + docker compose commands + failure-mode diagnostics + L-004 | 2026-05-24 | `aab0379` | ✅ Done |
+| 032 | F-RATELIMIT T1 — scaffold ratelimit package (Config + Policy + IP resolver + ErrorWriter) + properties block + ClientIpResolverTest (8) + RateLimitPolicyTest (12) | 2026-05-24 | `1f28999` | ✅ Done |
+| 033 | F-RATELIMIT T2 — RateLimitFilter wired into SecurityFilterChain (addFilterBefore) + 6 real-chain integration tests + AuthControllerIntegrationTest test-profile override | 2026-05-24 | `466f0bf` | ✅ Done |
+| 034 | F-RATELIMIT T3 + parallel F-BULKHEAD + F-API-DOCS — meter cardinality guard (`RateLimiterMeterFilter`) + `RequestNotPermitted` exception advice + `RateLimitMetricsIntegrationTest` (2); bundled with the parallel F-BULKHEAD + F-API-DOCS work | 2026-05-24 | `13be332` | ✅ Done |
+| 035 | F-RATELIMIT T4 — Postman `RATE_LIMIT_EXCEEDED on 6th attempt` request with priming pre-request script; Newman regression 14 requests / 27 assertions / 0 failures / 2.1s against docker compose Kafka + local app | 2026-05-24 | `413e415` | ✅ Done |
+| 036 | F-RATELIMIT T5 — docs closure: ROADMAP M5 consolidated (F-RATELIMIT + F-BULKHEAD + F-API-DOCS) + STATE AD-035 + docs/business-rules.md Rate limiting section + docs/observability.md Rate-limit signals + CLAUDE.md / README.md / README-CHALLENGE.md / TESTING.md updates + spec traceability flipped to Verified | 2026-05-24 | (pending) | ✅ Done |
 
 > Commits are pending — none of the above is in git yet beyond the initial commit `0780ce3`. To be staged when the user asks.
 

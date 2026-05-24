@@ -86,6 +86,13 @@ F-RESILIENCE closed C-8 and added circuit breakers:
 - `@CircuitBreaker(name="<port>")` annotates each outbound adapter method (Stock, InvoiceRegistration, Delivery, AccountsReceivable). Per-port thresholds live in `application.properties` under `resilience4j.circuitbreaker.instances.<name>.*`.
 - `@TimeLimiter` is intentionally deferred (would force `CompletableFuture` on every port). Documented in AD-027.
 
+F-BULKHEAD added semaphore bulkheads on the same four adapters (M6, 2026-05-24):
+
+- `@Bulkhead(name="<port>")` lives **alongside** `@CircuitBreaker` on each adapter method. Same instance name; same `application.properties` shape under `resilience4j.bulkhead.instances.<name>.*`.
+- Calibration: `deliveryPort.max-concurrent-calls=5` (tighter, because `Thread.sleep(5000)` holds permits for 5s), `stock=registration=accountsReceivable=20`. `max-wait-duration=0` everywhere — fail-fast, rejected calls bubble to `@RetryableTopic`.
+- `SEMAPHORE` variant only — `THREADPOOL` would force `CompletableFuture<T>` on every port (same trade-off AD-027 rejected for `@TimeLimiter`).
+- Operator-facing doc: [`docs/bulkhead-strategy.md`](docs/bulkhead-strategy.md) — supermarket-checkout analogy, calibration table, AD-033 decision log. `resilience4j-micrometer` auto-publishes `resilience4j.bulkhead.available.concurrent.calls{name}` on `/actuator/prometheus`.
+
 F-DEFECTS-FUNCTIONAL resolved the first correctness batch:
 
 - `LegacyProductTaxRateCalculator` is stateless per call (C-1 fixed).
@@ -101,6 +108,28 @@ F-DEFECTS-PERFORMANCE closed C-6 with Kafka async dispatch:
 - In-memory `IdempotencyStore` keyed on `(topic, eventId)` dedupes Kafka redelivery. **Not durable** — production needs Redis/Postgres (see `AD-024`).
 - Local stack: `docker compose up --build` starts `cp-kafka` (KRaft) + the app; HTTP on 8080, Kafka external listener on host 29092.
 - Tests: `InvoiceKafkaFlowIntegrationTest` uses `@EmbeddedKafka` for end-to-end proof. `InvoiceControllerIntegrationTest` and `InvoiceGeneratorApplicationTests` set `app.messaging.kafka.enabled=false` plus `NoOpKafkaTestConfig` to skip Kafka context wiring.
+
+## Rate limiting (F-RATELIMIT, complete)
+
+Per-IP rate limiting via `resilience4j-ratelimiter` (M5, 2026-05-24):
+
+- `OncePerRequestFilter` (`RateLimitFilter`) wired into the existing `SecurityFilterChain` via `addFilterBefore(rateLimitFilter, BearerTokenAuthenticationFilter.class)` so abuse traffic is rejected **before** any JWT validation cost is paid.
+- Three statically-named groups in `application.properties` under `resilience4j.ratelimiter.instances.*`: `auth-login` (5/min — brute-force defence), `invoice-generate` (30/min — canonical + legacy alias share the bucket), `default` (60/min — catch-all so any future `/api/**` endpoint inherits a limit). `/actuator/**` is **exempt** so Prometheus scrape + k8s probes are never falsely throttled. `timeout-duration=0` everywhere (fail-fast).
+- Per-IP isolation: `ClientIpResolver` resolves IP from `X-Forwarded-For` first hop with `getRemoteAddr()` fallback and an `"unknown"` sentinel. The filter synthesises a per-`(group, ip)` `RateLimiter` via `registry.rateLimiter(group + ":" + ip, prototype.getRateLimiterConfig())` — registry lookup is a thread-safe `ConcurrentHashMap` get.
+- 429 contract: `HTTP 429` + `{"codigo":"RATE_LIMIT_EXCEEDED","mensagem":"..."}` + `Retry-After: <ceil(refresh-period)>` integer-seconds header. Same `{codigo, mensagem}` envelope F-AUTH + F-DEFECTS-FUNCTIONAL use. `ApiExceptionHandler.handleRequestNotPermitted` covers any future `@RateLimiter` annotation usage (defence-in-depth).
+- Cardinality guard: `RateLimiterMeterFilter` (Micrometer `MeterFilter`) denies any `resilience4j.ratelimiter.*` meter whose `name` tag is not one of the three statically-named instances — keeps the per-IP synthetic instances from publishing one time-series per unique IP (AD-020 budget preserved). `RateLimitMetricsIntegrationTest` proves it via a scrape-based regex check for `:` in the `name` tag.
+- Tests: 6 real-chain integration tests in `RateLimitIntegrationTest` (distinct synthetic XFF IPs per method so buckets don't leak across tests) + 2 scrape assertions in `RateLimitMetricsIntegrationTest` + 8 unit (`ClientIpResolverTest`) + 12 unit (`RateLimitPolicyTest`). `AuthControllerIntegrationTest` raises the test-profile `auth-login.limit-for-period` to `10000` via `@TestPropertySource` so its six login calls don't falsely trip prod's 5/min ceiling. **Don't add per-IP tags to metrics** — see AD-020.
+- AD-035 in `STATE.md`; operator-facing summary in `docs/business-rules.md` (Rate limiting section) and `docs/observability.md` (Rate-limit signals sub-section). Postman/Newman regression: `07 - Auth — RATE_LIMIT_EXCEEDED on 6th attempt` request, pre-request primes the bucket from `X-Forwarded-For=10.99.0.1`.
+
+## API documentation (F-API-DOCS, complete)
+
+OpenAPI 3 + Swagger UI for the three productive endpoints (M6, 2026-05-24):
+
+- Spec: `GET http://localhost:8080/v3/api-docs` (JSON), `GET /v3/api-docs.yaml` (YAML).
+- Interactive UI: `GET http://localhost:8080/swagger-ui.html`.
+- Authentication is documented as the `bearer-jwt` HTTP security scheme (HS256 JWT). Click "Authorize" in Swagger UI, paste a token from `POST /api/auth/login`, and the `Authorization: Bearer ...` header attaches to every operation. The login endpoint opts out via `@SecurityRequirements({})` so the chicken-and-egg loop is broken.
+- `SecurityConfig` permits `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`; F-RATELIMIT already does not throttle them (they live outside `/api/**`).
+- DTO field semantics still live in [`docs/business-rules.md`](docs/business-rules.md) — Swagger UI shows the field tree; the prose stays in the SSOT. AD-034 records the trade-off.
 
 ## Testing Notes
 

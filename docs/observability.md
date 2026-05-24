@@ -215,6 +215,45 @@ open http://localhost:16686
 
 ---
 
+## Rate-limit signals (F-RATELIMIT)
+
+`resilience4j-micrometer` auto-publishes one set of meters per statically-named
+rate-limiter instance — three instances, three series each on
+`/actuator/prometheus`:
+
+```
+resilience4j_ratelimiter_available_permissions{name="auth-login"}
+resilience4j_ratelimiter_available_permissions{name="invoice-generate"}
+resilience4j_ratelimiter_available_permissions{name="default"}
+resilience4j_ratelimiter_waiting_threads{name=...}   # always 0 (timeout-duration=0)
+```
+
+**The `name` tag never carries an IP suffix** even though the filter
+synthesises a per-`(group, ip)` `RateLimiter` at runtime — `RateLimiterMeterFilter`
+denies any meter whose `name` tag is not one of the three groups, preserving
+the AD-020 cardinality budget. Per-IP signals stay in **logs** (filter logs
+DEBUG-level decisions with `clientIp`) and **trace attributes** only.
+
+Useful queries:
+
+```promql
+# Permits remaining per group right now.
+resilience4j_ratelimiter_available_permissions
+
+# Anything where the auth-login group is depleted for any aggregate sample.
+min_over_time(resilience4j_ratelimiter_available_permissions{name="auth-login"}[5m]) == 0
+
+# Rate of 429 responses in the last 5 minutes (relies on the Spring HTTP timer).
+sum(rate(http_server_requests_seconds_count{status="429"}[5m])) by (uri)
+```
+
+The rate-limit signals are **not** an SLI — they remain queryable for ad-hoc
+debugging but did not earn a row in the four-SLI catalog (AD-017 stays frozen
+at four). Promoting "% of requests rejected with 429" to a fifth SLI would
+re-open that decision; flagged under RLIM-OOS-5 if a future operator wants it.
+
+---
+
 ## F-AWS reuse path
 
 When the AWS deployment lands (F-AWS), the four queries above translate to CloudWatch

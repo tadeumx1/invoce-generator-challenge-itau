@@ -197,7 +197,72 @@ The first functional-defect pass resolved C-1 through C-4:
 
 ---
 
-## 7. Glossary — Brazilian terms kept untranslated
+## 7. Rate limiting (F-RATELIMIT)
+
+Per-IP rate limiting throttles abusive HTTP traffic before it reaches the
+controller layer. Implemented as a Servlet filter inside the existing
+`SecurityFilterChain`, so the limit is enforced **before** JWT validation cost
+is paid (this is the whole point of putting brute-force defence at the edge).
+
+### 7.1 Per-endpoint groups
+
+| URI pattern                                                                    | Group              | `limit-for-period` | `limit-refresh-period` | Why                                                  |
+| ------------------------------------------------------------------------------ | ------------------ | ------------------ | ---------------------- | ---------------------------------------------------- |
+| `POST /api/auth/login`                                                         | `auth-login`       | 5                  | 60s                    | Brute-force defence. Allows interactive retries.     |
+| `POST /api/orders/generate-invoice`, `POST /api/pedido/gerarNotaFiscal`        | `invoice-generate` | 30                 | 60s                    | Business throughput. Canonical + legacy alias share. |
+| every other `/api/**` request                                                  | `default`          | 60                 | 60s                    | Catch-all so any future endpoint inherits a limit.   |
+| `/actuator/health`, `/actuator/health/**`, `/actuator/info`, `/actuator/prometheus` | (exempt — never throttled) | — | — | Prometheus scrape (every 15s) + k8s probes must never be falsely throttled. |
+| `OPTIONS` preflight                                                            | (exempt)           | —                  | —                      | CORS preflight is per-browser cache management.      |
+
+Integers above live in `application.properties` under
+`resilience4j.ratelimiter.instances.<group>.*`. SREs can tune them per
+environment without a code change.
+
+### 7.2 Per-IP isolation
+
+Bucket key is the client IP, resolved from the leftmost hop of
+`X-Forwarded-For` (the de-facto convention where the leftmost entry is the
+original client) with `HttpServletRequest.getRemoteAddr()` as fallback. Two
+clients behind different IPs never share a bucket — IP `A` exhausting a group
+does **not** block IP `B`.
+
+### 7.3 429 response shape
+
+When the per-`(group, ip)` bucket runs out of permits the filter returns:
+
+```
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+Retry-After: 60
+
+{"codigo":"RATE_LIMIT_EXCEEDED","mensagem":"Limite de requisicoes excedido. Tente novamente em alguns instantes."}
+```
+
+The envelope is the same `{codigo, mensagem}` shape every other 4xx response
+already uses (`UNSUPPORTED_TAX_REGIME`, `INVALID_TAX_REGIME`,
+`INVALID_DELIVERY_REGION`, `INVALID_CREDENTIALS`, `INVALID_LOGIN_PAYLOAD`).
+`Retry-After` is an integer-seconds value computed as the ceiling of the
+group's configured `limit-refresh-period` — the next *guaranteed* refill
+window (conservative by design; see AD-035).
+
+### 7.4 Demo-grade caveats
+
+- **In-process limit.** Per-IP `RateLimiter` instances live in a process-local
+  registry with no TTL eviction. Two ECS Fargate tasks behind the same ALB
+  each enforce the limit independently, so the effective per-IP rate is
+  `tasks × limit-for-period`. Production scale-out requires a distributed
+  store (Redis / ElastiCache). Documented under RLIM-OOS-3 in
+  `.specs/features/ratelimit/spec.md`.
+- **Per-IP, not per-user.** Authenticated endpoints could be keyed on the
+  JWT `sub` claim instead; per-IP was chosen for simplicity (login has no
+  JWT yet). Captured under RLIM-OOS-2 as the natural production upgrade.
+- **No allowlist.** Known load-test runners or synthetics share the bucket
+  with real traffic — production should add WAF / API Gateway throttling at
+  the edge for the IP exemption. Captured under RLIM-OOS-6.
+
+---
+
+## 8. Glossary — Brazilian terms kept untranslated
 
 | Term                 | Meaning                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------- |

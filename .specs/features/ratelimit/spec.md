@@ -368,46 +368,46 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 
 | Requirement ID | Story                                | Phase  | Status  |
 | -------------- | ------------------------------------ | ------ | ------- |
-| RLIM-01        | P1: Login throttled                  | Tasks  | Pending |
-| RLIM-02        | P1: Login throttled                  | Tasks  | Pending |
-| RLIM-03        | P1: Login throttled                  | Tasks  | Pending |
-| RLIM-04        | P1: Login throttled                  | Tasks  | Pending |
-| RLIM-05        | P1: Login throttled                  | Tasks  | Pending |
-| RLIM-06        | P1: Invoice throttled                | Tasks  | Pending |
-| RLIM-07        | P1: Invoice throttled                | Tasks  | Pending |
-| RLIM-08        | P1: Invoice throttled                | Tasks  | Pending |
-| RLIM-09        | P1: Per-endpoint groups              | Tasks  | Pending |
-| RLIM-10        | P1: Per-endpoint groups              | Tasks  | Pending |
-| RLIM-11        | P1: Per-endpoint groups              | Tasks  | Pending |
-| RLIM-12        | P1: Actuator exempt                  | Tasks  | Pending |
-| RLIM-13        | P1: Actuator exempt                  | Tasks  | Pending |
-| RLIM-14        | P1: Actuator exempt                  | Tasks  | Pending |
-| RLIM-15        | P1: Actuator exempt                  | Tasks  | Pending |
-| RLIM-16        | P1: Per-IP isolation                 | Tasks  | Pending |
-| RLIM-17        | P1: Per-IP isolation                 | Tasks  | Pending |
-| RLIM-18        | P1: Per-IP isolation                 | Tasks  | Pending |
-| RLIM-19        | P1: Per-IP isolation                 | Tasks  | Pending |
-| RLIM-20        | P2: Error contract                   | Tasks  | Pending |
-| RLIM-21        | P2: Error contract                   | Tasks  | Pending |
-| RLIM-22        | P2: Error contract                   | Tasks  | Pending |
-| RLIM-23        | P2: Error contract                   | Tasks  | Pending |
-| RLIM-24        | P2: Metrics exposed                  | Tasks  | Pending |
-| RLIM-25        | P2: Metrics exposed                  | Tasks  | Pending |
-| RLIM-26        | P2: Metrics exposed                  | Tasks  | Pending |
-| RLIM-27        | P3: Existing tests stay green        | Tasks  | Pending |
-| RLIM-28        | P3: Existing tests stay green        | Tasks  | Pending |
-| RLIM-29        | P3: Existing tests stay green        | Tasks  | Pending |
-| RLIM-30        | P3: Existing tests stay green        | Tasks  | Pending |
-| RLIM-31        | P3: Honest documentation             | Tasks  | Pending |
-| RLIM-32        | P3: Honest documentation             | Tasks  | Pending |
-| RLIM-33        | P3: Honest documentation             | Tasks  | Pending |
-| RLIM-34        | P3: Honest documentation             | Tasks  | Pending |
-| RLIM-35        | P3: Honest documentation             | Tasks  | Pending |
-| RLIM-36        | P3: Honest documentation             | Tasks  | Pending |
+| RLIM-01        | P1: Login throttled                  | Tasks  | Verified |
+| RLIM-02        | P1: Login throttled                  | Tasks  | Verified |
+| RLIM-03        | P1: Login throttled                  | Tasks  | Verified |
+| RLIM-04        | P1: Login throttled                  | Tasks  | Verified |
+| RLIM-05        | P1: Login throttled                  | Tasks  | Verified |
+| RLIM-06        | P1: Invoice throttled                | Tasks  | Verified |
+| RLIM-07        | P1: Invoice throttled                | Tasks  | Verified |
+| RLIM-08        | P1: Invoice throttled                | Tasks  | Verified |
+| RLIM-09        | P1: Per-endpoint groups              | Tasks  | Verified |
+| RLIM-10        | P1: Per-endpoint groups              | Tasks  | Verified |
+| RLIM-11        | P1: Per-endpoint groups              | Tasks  | Verified |
+| RLIM-12        | P1: Actuator exempt                  | Tasks  | Verified |
+| RLIM-13        | P1: Actuator exempt                  | Tasks  | Verified |
+| RLIM-14        | P1: Actuator exempt                  | Tasks  | Verified |
+| RLIM-15        | P1: Actuator exempt                  | Tasks  | Verified |
+| RLIM-16        | P1: Per-IP isolation                 | Tasks  | Verified |
+| RLIM-17        | P1: Per-IP isolation                 | Tasks  | Verified |
+| RLIM-18        | P1: Per-IP isolation                 | Tasks  | Verified |
+| RLIM-19        | P1: Per-IP isolation                 | Tasks  | Verified |
+| RLIM-20        | P2: Error contract                   | Tasks  | Verified |
+| RLIM-21        | P2: Error contract                   | Tasks  | Verified |
+| RLIM-22        | P2: Error contract                   | Tasks  | Verified |
+| RLIM-23        | P2: Error contract                   | Tasks  | Verified |
+| RLIM-24        | P2: Metrics exposed                  | Tasks  | Verified |
+| RLIM-25        | P2: Metrics exposed                  | Tasks  | Verified |
+| RLIM-26        | P2: Metrics exposed                  | Tasks  | Verified |
+| RLIM-27        | P3: Existing tests stay green        | Tasks  | Verified |
+| RLIM-28        | P3: Existing tests stay green        | Tasks  | Verified |
+| RLIM-29        | P3: Existing tests stay green        | Tasks  | Verified |
+| RLIM-30        | P3: Existing tests stay green        | Tasks  | Verified |
+| RLIM-31        | P3: Honest documentation             | Tasks  | Verified |
+| RLIM-32        | P3: Honest documentation             | Tasks  | Verified |
+| RLIM-33        | P3: Honest documentation             | Tasks  | Verified |
+| RLIM-34        | P3: Honest documentation             | Tasks  | Verified |
+| RLIM-35        | P3: Honest documentation             | Tasks  | Verified |
+| RLIM-36        | P3: Honest documentation             | Tasks  | Verified |
 
 **ID format:** `RLIM-NN`.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
-**Coverage:** 36 total, 0 mapped to tasks yet (tasks.md to follow).
+**Coverage:** 36 total, 36 mapped to tasks T1..T5 and **Verified** as of 2026-05-24 (`./mvnw verify` green, 137 fast tests; Newman 14 req / 27 assertions / 0 failures including the new `RATE_LIMIT_EXCEEDED` request).
 
 ---
 

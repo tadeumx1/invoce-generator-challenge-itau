@@ -94,6 +94,9 @@ M3 — Operações (5/5) ✅
 
 M4 — Segurança & access control (1/1) ✅
   F-AUTH ✅
+
+M5 — Hardening & DX polish (3/3) ✅
+  F-RATELIMIT ✅   F-BULKHEAD ✅   F-API-DOCS ✅
 ```
 
 Legenda: ✅ implementado.
@@ -124,7 +127,9 @@ Legenda: ✅ implementado.
 | Documentação mínima | **transversal** — `README.md`, `CLAUDE.md`, `docs/business-rules.md`, `docs/observability.md`, `docs/aws-architecture.md`, `docs/translation-changelog.md`, todo o `.specs/` + **F-POSTMAN** (collection executável com `npx newman` cobrindo happy-paths e rejeições) | ✅ |
 | Planejamento de deploy e operação | **F-DEFECTS-PERFORMANCE T4** (Dockerfile + docker-compose) + **F-AWS** (Terraform 5 módulos validate-clean) + **F-DEPLOY-ACTION** (GitHub Actions pipeline com OIDC, triggers comentados) | ✅ |
 | Observabilidade (logs, métricas, tracing) | **F-OBSERVABILITY** | ✅ JSON logs (`logstash-logback-encoder`), Micrometer com 4 SLIs explícitos, OTel tracing → Jaeger local / X-Ray AWS |
-| Resiliência para integrações lentas/instáveis | **F-DEFECTS-PERFORMANCE T3** (retry/DLT + idempotência) + **F-RESILIENCE** (Resilience4j `@CircuitBreaker` + C-8 fix) | ✅ |
+| Resiliência para integrações lentas/instáveis | **F-DEFECTS-PERFORMANCE T3** (retry/DLT + idempotência) + **F-RESILIENCE** (Resilience4j `@CircuitBreaker` + C-8 fix) + **F-BULKHEAD** (semaphore por adapter; `delivery=5 / outros=20`, fail-fast) | ✅ |
+| Proteção contra abuso / brute-force | **F-RATELIMIT** | ✅ Per-IP rate limiting via `resilience4j-ratelimiter` (`auth-login` 5/min, `invoice-generate` 30/min, `default` 60/min; `/actuator/**` isento). 429 + `{codigo:"RATE_LIMIT_EXCEEDED", mensagem}` + `Retry-After`. Newman cobre o caminho 429 |
+| Documentação executável da API | **F-API-DOCS** | ✅ OpenAPI 3 (`/v3/api-docs`) + Swagger UI (`/swagger-ui.html`) via springdoc 2.8.x; security scheme `bearer-jwt` espelhando F-AUTH |
 
 ### Proposta de arquitetura → feature responsável
 

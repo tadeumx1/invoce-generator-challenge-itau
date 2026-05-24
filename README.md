@@ -91,6 +91,18 @@ Demo users: `demo`/`demo123` (scope `invoice:write`) and `admin`/`admin123` (sco
 `invoice:write invoice:admin`). The legacy URL `POST /api/pedido/gerarNotaFiscal` is
 served as an alias for backwards compatibility and is equally protected.
 
+### Swagger UI
+
+The full OpenAPI 3 document and an interactive Swagger UI are exposed once the app is
+running:
+
+- **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) — click **Authorize**, paste a JWT from `POST /api/auth/login`, then "Try it out" on `POST /api/orders/generate-invoice`.
+- **OpenAPI JSON:** `http://localhost:8080/v3/api-docs`
+- **OpenAPI YAML:** `http://localhost:8080/v3/api-docs.yaml`
+
+F-API-DOCS (M5) added springdoc-openapi 2.8.x; the docs surface is exempt from both auth
+(`SecurityConfig.permitAll`) and rate limiting (already outside `/api/**`).
+
 ### Postman collection
 
 A Postman v2.1.0 collection at
@@ -416,6 +428,43 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
     against a live account (same posture as F-AWS). Resolves the README's
     *Planejamento de deploy e operação* theme on the pipeline side.
 
+### M5 — Hardening & DX polish (complete)
+
+12. **F-RATELIMIT** — Per-IP rate limiting via `resilience4j-ratelimiter`.
+    `OncePerRequestFilter` wired into the existing `SecurityFilterChain` via
+    `addFilterBefore(rateLimitFilter, BearerTokenAuthenticationFilter.class)` so
+    abuse traffic is rejected before any JWT validation cost is paid. Three
+    statically-named groups: `auth-login` 5/min (brute-force defence on
+    `POST /api/auth/login`), `invoice-generate` 30/min (canonical + legacy alias
+    share), `default` 60/min (catch-all). `/actuator/**` is exempt so Prometheus
+    scrape + k8s probes never get falsely throttled. Per-IP isolation by
+    synthesising a per-`(group, ip)` `RateLimiter` at runtime; `RateLimiterMeterFilter`
+    keeps the synthetic per-IP names off Micrometer so AD-020 cardinality budget
+    is preserved. 429 carries the same `{codigo, mensagem}` envelope as every other
+    4xx + a `Retry-After` integer-seconds header. 20 new tests
+    (`RateLimitIntegrationTest` 6 + `RateLimitMetricsIntegrationTest` 2 +
+    `ClientIpResolverTest` 8 + `RateLimitPolicyTest` 12); Postman/Newman regression
+    covers the 429 path. Operator-facing summary in
+    [`docs/business-rules.md`](docs/business-rules.md) §7 and
+    [`docs/observability.md`](docs/observability.md) Rate-limit signals; decision
+    log under AD-035.
+13. **F-BULKHEAD** — Resilience4j semaphore `@Bulkhead` alongside the existing
+    `@CircuitBreaker` on the four outbound adapters. Calibration: `deliveryPort=5`
+    (tighter because `Thread.sleep(5000)` holds permits for 5 s) and `stock = registration =
+    accountsReceivable = 20`. `max-wait-duration=0` — fail-fast, rejected calls bubble to
+    `@RetryableTopic`. `SEMAPHORE` variant only (the `THREADPOOL` variant would force
+    `CompletableFuture<T>` on every port, the same trade-off AD-027 rejected for
+    `@TimeLimiter`). Operator-facing rationale + supermarket-checkout analogy in
+    [`docs/bulkhead-strategy.md`](docs/bulkhead-strategy.md); decision log under AD-033.
+14. **F-API-DOCS** — `springdoc-openapi-starter-webmvc-ui:2.8.13` exposes an OpenAPI 3
+    document at `GET /v3/api-docs` (+ `.yaml`) and Swagger UI at
+    [`/swagger-ui.html`](http://localhost:8080/swagger-ui.html) for the three productive
+    endpoints. `OpenAPIConfig` declares a single `bearer-jwt` HTTP security scheme
+    mirroring F-AUTH; the login endpoint opts out via `@SecurityRequirements({})`.
+    `SecurityConfig` permits the docs surface; F-RATELIMIT already does not throttle it.
+    AD-034 records the trade-off (no DTO `@Schema(description=...)` — field semantics
+    stay in [`docs/business-rules.md`](docs/business-rules.md), which is the SSOT).
+
 ### Notable architectural decisions
 
 Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (32 ADRs total):
@@ -444,6 +493,11 @@ Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (32 ADRs total)
   OIDC for auth and live task-definition re-render (so any Terraform-managed
   container field — env vars, ADOT sidecar, resource sizes — is preserved across
   deploys).
+- **AD-035** F-RATELIMIT: `resilience4j-ratelimiter` reusing the AD-026 starter;
+  per-endpoint groups + actuator exempt; per-IP key with `X-Forwarded-For`
+  fallback; `Filter`-in-`SecurityFilterChain` seam over `@RateLimiter` annotation;
+  `{codigo, mensagem}` + `Retry-After` envelope; per-IP synthetic instance names
+  kept off Micrometer via a `MeterFilter` cardinality guard.
 - **AD-032** F-AUTH: HS256 over RS256, in-memory user store, scope-based authZ,
   `JwtTestSupport` test pattern. Explicitly diverges from the edge-validates
   production recommendation in `docs/auth-strategy.md` because the user wanted a
