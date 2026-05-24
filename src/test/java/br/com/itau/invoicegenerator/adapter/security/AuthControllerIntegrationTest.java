@@ -29,7 +29,11 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(
     properties = {
       "app.messaging.kafka.enabled=false",
-      "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration"
+      "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration",
+      // F-RATELIMIT T2 — six login attempts here would trip the prod limit of 5/min. Raise the
+      // ceiling for this class so the suite never falsely throttles. RateLimitIntegrationTest is
+      // the only class that exercises the throttling contract directly.
+      "resilience4j.ratelimiter.instances.auth-login.limit-for-period=10000"
     })
 class AuthControllerIntegrationTest {
 

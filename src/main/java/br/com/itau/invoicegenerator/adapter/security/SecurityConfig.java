@@ -2,6 +2,7 @@ package br.com.itau.invoicegenerator.adapter.security;
 
 import br.com.itau.invoicegenerator.adapter.security.error.ApiBearerAccessDeniedHandler;
 import br.com.itau.invoicegenerator.adapter.security.error.ApiBearerAuthenticationEntryPoint;
+import br.com.itau.invoicegenerator.adapter.security.ratelimit.RateLimitFilter;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
@@ -19,6 +20,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -71,10 +73,12 @@ public class SecurityConfig {
       HttpSecurity http,
       JwtDecoder jwtDecoder,
       ApiBearerAuthenticationEntryPoint authenticationEntryPoint,
-      ApiBearerAccessDeniedHandler accessDeniedHandler)
+      ApiBearerAccessDeniedHandler accessDeniedHandler,
+      RateLimitFilter rateLimitFilter)
       throws Exception {
     return http.csrf(csrf -> csrf.disable())
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .addFilterBefore(rateLimitFilter, BearerTokenAuthenticationFilter.class)
         .exceptionHandling(
             eh ->
                 eh.authenticationEntryPoint(authenticationEntryPoint)

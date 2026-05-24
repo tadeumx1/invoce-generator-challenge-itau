@@ -45,9 +45,9 @@ public class RateLimitErrorWriter {
   private long retryAfterSeconds(String instanceName) {
     Duration refresh =
         registry
-            .getConfiguration(instanceName)
-            .orElse(registry.getDefaultConfig())
-            .getLimitRefreshPeriod();
+            .find(instanceName)
+            .map(rl -> rl.getRateLimiterConfig().getLimitRefreshPeriod())
+            .orElseGet(() -> registry.getDefaultConfig().getLimitRefreshPeriod());
     long seconds = refresh.toSeconds();
     if (refresh.minusSeconds(seconds).toNanos() > 0) {
       seconds += 1;

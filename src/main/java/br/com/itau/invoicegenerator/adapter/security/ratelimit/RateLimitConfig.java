@@ -2,6 +2,7 @@ package br.com.itau.invoicegenerator.adapter.security.ratelimit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -30,5 +31,27 @@ public class RateLimitConfig {
   public RateLimitErrorWriter rateLimitErrorWriter(
       ObjectMapper objectMapper, RateLimiterRegistry registry) {
     return new RateLimitErrorWriter(objectMapper, registry);
+  }
+
+  @Bean
+  public RateLimitFilter rateLimitFilter(
+      RateLimitPolicy policy,
+      RateLimiterRegistry registry,
+      ClientIpResolver ipResolver,
+      RateLimitErrorWriter errorWriter) {
+    return new RateLimitFilter(policy, registry, ipResolver, errorWriter);
+  }
+
+  /**
+   * Suppress Spring Boot's auto-registration of {@link RateLimitFilter} as a top-level servlet
+   * filter — the {@code SecurityFilterChain} owns its placement via {@code addFilterBefore}.
+   * Without this, the filter would run twice per request.
+   */
+  @Bean
+  public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(
+      RateLimitFilter filter) {
+    FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+    registration.setEnabled(false);
+    return registration;
   }
 }
