@@ -127,6 +127,91 @@
             },
             "description": "F-AUTH rejection. Proves the 401 + INVALID_CREDENTIALS contract."
           }
+        },
+        {
+          "name": "POST /api/auth/login — RATE_LIMIT_EXCEEDED on 6th attempt",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// F-RATELIMIT — deplete the auth-login bucket from a synthetic IP so the main",
+                  "// request below trips at the 6th attempt. Uses X-Forwarded-For=10.99.0.1 so the",
+                  "// bucket is isolated from the rest of the collection (which uses no XFF and",
+                  "// therefore the local IP's bucket).",
+                  "const baseUrl = pm.collectionVariables.get('baseUrl');",
+                  "const payload = { mode: 'raw', raw: JSON.stringify({ username: 'demo', password: 'demo123' }) };",
+                  "const header = { 'Content-Type': 'application/json', 'X-Forwarded-For': '10.99.0.1' };",
+                  "const prime = (n, cb) => {",
+                  "  if (n === 0) return cb();",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/api/auth/login',",
+                  "    method: 'POST',",
+                  "    header: header,",
+                  "    body: payload",
+                  "  }, (err, res) => { prime(n - 1, cb); });",
+                  "};",
+                  "prime(5, () => {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 429 Too Many Requests', function () {",
+                  "  pm.response.to.have.status(429);",
+                  "});",
+                  "pm.test('error envelope is {codigo:RATE_LIMIT_EXCEEDED, mensagem}', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.codigo).to.eql('RATE_LIMIT_EXCEEDED');",
+                  "  pm.expect(body.mensagem).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('Retry-After header is a positive integer', function () {",
+                  "  const header = pm.response.headers.get('Retry-After');",
+                  "  pm.expect(header).to.not.be.null;",
+                  "  const seconds = parseInt(header, 10);",
+                  "  pm.expect(seconds).to.be.a('number').and.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "10.99.0.1"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-ratelimit-trip"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "F-RATELIMIT proof. Pre-request script primes the auth-login bucket with 5 attempts from X-Forwarded-For=10.99.0.1 (prod limit-for-period=5). The 6th attempt below trips the limiter and returns HTTP 429 with `{codigo:RATE_LIMIT_EXCEEDED, mensagem}` plus a `Retry-After` integer-seconds header. See `.specs/features/ratelimit/spec.md` (RLIM-01..05, RLIM-20..22) for the contract."
+          }
         }
       ]
     },
