@@ -8,6 +8,16 @@ output "ecr_repository_url" {
   value       = module.ecs.ecr_repository_url
 }
 
+output "ecs_cluster_name" {
+  description = "ECS cluster name. Consumed by the GitHub Actions deploy workflow to force a new deployment."
+  value       = module.ecs.cluster_name
+}
+
+output "ecs_service_name" {
+  description = "ECS service name. Consumed by the GitHub Actions deploy workflow."
+  value       = module.ecs.service_name
+}
+
 output "kafka_bootstrap_brokers_sasl_iam" {
   description = "Bootstrap brokers the application uses under the `aws` Spring profile (KAFKA_BOOTSTRAP_SERVERS)."
   value       = module.msk.bootstrap_brokers_sasl_iam

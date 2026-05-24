@@ -1,0 +1,226 @@
+# ------------------------------------------------------------------------------
+# Deploy invoice-generator to AWS (ECS Fargate behind API Gateway + MSK).
+#
+# Pipeline shape:
+#   1. build-and-test   - Maven verify (Spotless, Checkstyle, JaCoCo, tests).
+#   2. terraform-apply  - fmt/validate/plan/apply against infra/terraform/.
+#   3. docker-deploy    - build image, push to ECR (tag = git SHA),
+#                         register a new task definition revision pinned to
+#                         that tag, and force a rolling ECS deployment.
+#
+# Auth model: GitHub OIDC -> AWS IAM role (no long-lived access keys in
+# secrets). The role trust policy must allow this repo's `main` branch.
+# Required repo secret: AWS_DEPLOY_ROLE_ARN.
+# Required repo variables (or hardcode): AWS_REGION, TF_STATE_BUCKET,
+# TF_STATE_LOCK_TABLE.
+#
+# Trigger intentionally commented out — this workflow is part of the
+# technical challenge deliverables and should not actually run against
+# a live AWS account. Uncomment `on:` to enable.
+# ------------------------------------------------------------------------------
+
+name: Deploy to AWS
+
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - 'src/**'
+#       - 'pom.xml'
+#       - 'Dockerfile'
+#       - 'infra/terraform/**'
+#       - '.github/workflows/deploy-aws.yml'
+#   workflow_dispatch:
+
+on: workflow_dispatch  # placeholder so the YAML stays valid while triggers are commented
+
+concurrency:
+  group: deploy-aws-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # OIDC token for AWS auth
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TF_VERSION: '1.9.5'
+  JAVA_VERSION: '21'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1) Build + test gate. Same commands developers run locally (`./mvnw verify`).
+  #    Fails fast before touching AWS.
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Maven verify (tests + Spotless + Checkstyle + JaCoCo)
+        run: ./mvnw -B -ntp verify
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 2) Terraform apply. Plan is uploaded as an artifact so reviewers can audit
+  #    what changed before the apply step ran.
+  # ---------------------------------------------------------------------------
+  terraform-apply:
+    name: Terraform apply
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    outputs:
+      ecr_repo:     ${{ steps.tf-outputs.outputs.ecr_repo }}
+      cluster:      ${{ steps.tf-outputs.outputs.cluster }}
+      service:      ${{ steps.tf-outputs.outputs.service }}
+      api_endpoint: ${{ steps.tf-outputs.outputs.api_endpoint }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform fmt
+        run: terraform fmt -recursive -check
+
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=invoice-generator/${{ vars.ENVIRONMENT || 'dev' }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ vars.TF_STATE_LOCK_TABLE }}"
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=tfplan
+        env:
+          TF_VAR_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_region: ${{ env.AWS_REGION }}
+          TF_VAR_environment: ${{ vars.ENVIRONMENT || 'dev' }}
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/tfplan
+          retention-days: 7
+
+      - name: Terraform apply
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Capture outputs
+        id: tf-outputs
+        run: |
+          echo "ecr_repo=$(terraform output -raw ecr_repository_url)"   >> "$GITHUB_OUTPUT"
+          echo "cluster=$(terraform output -raw ecs_cluster_name)"     >> "$GITHUB_OUTPUT"
+          echo "service=$(terraform output -raw ecs_service_name)"     >> "$GITHUB_OUTPUT"
+          echo "api_endpoint=$(terraform output -raw api_endpoint)"    >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # 3) Build the runtime image, push to ECR tagged with the git SHA, then
+  #    register a new task definition revision pinned to that tag and force
+  #    a rolling deployment. Waits for the service to stabilise before
+  #    running a smoke check against the API Gateway endpoint.
+  # ---------------------------------------------------------------------------
+  docker-deploy:
+    name: Build, push & deploy
+    needs: terraform-apply
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push image
+        id: build
+        env:
+          ECR_REPO: ${{ needs.terraform-apply.outputs.ecr_repo }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "$ECR_REPO:$IMAGE_TAG" \
+            --tag "$ECR_REPO:latest" \
+            --cache-from "type=gha" \
+            --cache-to "type=gha,mode=max" \
+            --push \
+            .
+          echo "image_uri=$ECR_REPO:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Render new task definition
+        id: taskdef
+        env:
+          CLUSTER: ${{ needs.terraform-apply.outputs.cluster }}
+          SERVICE: ${{ needs.terraform-apply.outputs.service }}
+        run: |
+          # Pull the live task def, swap the image, drop fields AWS rejects on register.
+          aws ecs describe-task-definition \
+            --task-definition "$(aws ecs describe-services \
+                --cluster "$CLUSTER" --services "$SERVICE" \
+                --query 'services[0].taskDefinition' --output text)" \
+            --query 'taskDefinition' > task-def.json
+          jq --arg img "${{ steps.build.outputs.image_uri }}" '
+            .containerDefinitions |= map(if .name == "app" then .image = $img else . end)
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                  .compatibilities, .registeredAt, .registeredBy)
+          ' task-def.json > task-def-new.json
+          echo "path=task-def-new.json" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.taskdef.outputs.path }}
+          service: ${{ needs.terraform-apply.outputs.service }}
+          cluster: ${{ needs.terraform-apply.outputs.cluster }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
+
+      - name: Smoke test
+        env:
+          API: ${{ needs.terraform-apply.outputs.api_endpoint }}
+        run: |
+          echo "Smoke-testing $API ..."
+          curl -fsS --retry 5 --retry-delay 6 --retry-connrefused \
+            -X POST "$API/api/orders/generate-invoice" \
+            -H 'Content-Type: application/json' \
+            -d @src/main/resources/paylods/teste-pf.json

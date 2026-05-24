@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-23
-**Current Work:** All eight roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS). 88 fast tests still passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean. M3 milestone closed.
+**Current Work:** All nine roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-CICD). 88 fast tests still passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean; `.github/workflows/deploy-aws.yml` provides the proposal-grade GitHub Actions deploy pipeline (commented triggers, OIDC). M3 milestone closed.
 
 ---
 
@@ -224,6 +224,45 @@ api-gateway, observability). `terraform fmt -recursive -check + init -backend=fa
 The four F-OBSERVABILITY SLIs from `docs/observability.md` are re-expressed as
 CloudWatch metric math verbatim in the `observability` module — SSOT preserved.
 M3 closes with F-AWS.
+
+### AD-031: F-CICD scope — proposal-grade GitHub Actions deploy pipeline, OIDC, commented triggers (2026-05-23)
+
+**Decision:** F-CICD ships a **proposal-grade** GitHub Actions workflow at
+`.github/workflows/deploy-aws.yml` — the YAML parses cleanly as a runnable workflow but
+the `on:` triggers are commented out with an inert `workflow_dispatch` placeholder so
+nothing fires against a live AWS account. AWS authentication uses GitHub OIDC
+federation (`permissions: id-token: write` + `aws-actions/configure-aws-credentials@v4`
+with `role-to-assume`); no `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` references
+anywhere in the workflow. Deploy strategy is ECS rolling update via a freshly
+registered task-definition revision, where the new revision is rendered by mutating
+the **live** task definition (`aws ecs describe-task-definition` + `jq` image swap),
+not from a hand-rolled JSON template. Image tag is the immutable `${{ github.sha }}`.
+
+**Reason:** Mirrors AD-030 (F-AWS proposal-grade posture) — the deploy pipeline can be
+read in five minutes and audited as a runnable artifact, without burning the AWS
+account + MSK spend + OIDC trust-policy bootstrap that a live run would need. OIDC is
+the production-grade auth pattern in 2026 (no long-lived secret rotation, no
+secret-leakage blast radius); committed access keys would have been a worse
+demonstration even if they were operationally simpler. Live-task-def-re-render
+preserves every Terraform-managed field (env vars, resource sizes, ADOT sidecar)
+across deploys — a hand-rolled template would silently drift the moment the F-AWS ECS
+module added a new field. Rolling deploy was chosen over blue/green via CodeDeploy
+because the two-task Fargate service already configures rolling-deploy thresholds, and
+blue/green needs a second Terraform module + a CodeDeploy app/group + a deploy-time
+IAM role for no measurable benefit on a challenge project.
+
+**Trade-off:** No live deploy smoke test (same trade-off as AD-030). The runbook in
+`docs/aws-architecture.md` documents the steps from validate-clean to first live
+run; flipping the workflow to active requires uncommenting four lines of `on:` block,
+provisioning the IAM role + OIDC trust policy, populating the four repo variables
+and two secrets, and removing the inert `workflow_dispatch` placeholder.
+
+**Impact:** F-CICD closes the gap F-AWS explicitly left as out-of-scope ("CI/CD
+pipeline ... a separate concern"). Two new root Terraform outputs (`ecs_cluster_name`,
+`ecs_service_name`) were added to `infra/terraform/outputs.tf` so the pipeline reads
+live ECS resource names rather than re-deriving naming conventions. The F-AWS gate
+(`terraform fmt -recursive -check + init -backend=false + validate`) stays green after
+the additions. The roadmap closes M3 with F-CICD as the ninth and final feature.
 
 ### AD-029: F-OBSERVABILITY audit — registered ≠ wired (2026-05-23)
 
