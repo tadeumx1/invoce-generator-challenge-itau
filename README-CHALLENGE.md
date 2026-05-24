@@ -128,7 +128,7 @@ Legenda: ✅ implementado.
 | Item do README | Feature | Status |
 |---|---|---|
 | API Gateway | **F-AWS** | ✅ API Gateway HTTP API + VPC Link + internal ALB (módulo `infra/terraform/modules/api-gateway`); access logs JSON ecoando `X-Correlation-Id` |
-| Autenticação / autorização | **F-AWS** | 🟡 Documentado no `docs/aws-architecture.md` (ADR-031: Cognito User Pool vs JWT verifier externo) — não provisionado por escopo |
+| Autenticação / autorização | **F-AWS** | 🟡 Documentado em [`docs/auth-strategy.md`](docs/auth-strategy.md) + [`docs/aws-architecture.md`](docs/aws-architecture.md) (ADR-032: Cognito User Pool vs JWT verifier externo) — não provisionado por escopo |
 | APIs externas ou internas consumidas | **F-CLEAN** (ports) + **F-DEFECTS-PERFORMANCE** (eventos Kafka) | ✅ Domain ports + 4 tópicos Kafka definidos |
 | Tratamento de integrações lentas | **F-DEFECTS-PERFORMANCE** + **F-RESILIENCE** | ✅ Kafka async dispatch + `@RetryableTopic` + DLT; `@CircuitBreaker` por adapter (Resilience4j 2.2.0) |
 | Filas / processamento assíncrono | **F-DEFECTS-PERFORMANCE** | ✅ 4 tópicos `invoice.*.v1` + retry topics + DLT, consumers em grupos isolados |

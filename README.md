@@ -427,6 +427,7 @@ Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (31 ADRs total)
 - **[`.specs/codebase/ARCHITECTURE.md`](.specs/codebase/ARCHITECTURE.md)** — detailed layer diagram.
 - **[`.specs/features/<name>/`](.specs/features/)** — spec / design / tasks per feature.
 - **[`docs/business-rules.md`](docs/business-rules.md)** — frozen fiscal contract (brackets, freight, side effects).
+- **[`docs/auth-strategy.md`](docs/auth-strategy.md)** — when (and when not) to add `spring-boot-starter-oauth2-resource-server`; the edge-validates / services-trust pattern; pointer to ADR-032 for the Cognito vs external IdP comparison.
 - **[`docs/translation-changelog.md`](docs/translation-changelog.md)** — audit of the Portuguese → English rename.
 - **[`CLAUDE.md`](CLAUDE.md)** — day-to-day operational guide for contributors (commands, layout, constraints).
 - **[`README-CHALLENGE.md`](README-CHALLENGE.md)** — original challenge brief plus the README → feature mapping.

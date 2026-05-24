@@ -273,7 +273,7 @@ about the internal ALB DNS name.
     `responseLatency`, `X-Correlation-Id` echoed back.
 30. **WHEN** the API Gateway is created **THEN** the architecture doc and the module
     README SHALL state that **no authorizer is configured** — auth is the deferred
-    follow-up (ADR-031).
+    follow-up (ADR-032; expanded in `docs/auth-strategy.md`).
 31. **WHEN** the module emits outputs **THEN** it SHALL expose `api_endpoint` so the
     runbook smoke-test command can target it directly.
 
