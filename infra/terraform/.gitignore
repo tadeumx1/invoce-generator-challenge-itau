@@ -1,0 +1,24 @@
+# Local Terraform working directory + plugin cache
+.terraform/
+.terraform.tfstate.lock.info
+
+# State files — F-AWS is proposal-grade, so there is no remote backend.
+# Even so: never commit local state, it contains generated secrets / ARNs.
+*.tfstate
+*.tfstate.*
+
+# Filled-in variables — contains account_id at minimum, may contain secrets later.
+terraform.tfvars
+*.auto.tfvars
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Override files are local-only by convention.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Note: .terraform.lock.hcl IS committed — it pins provider versions across teammates.
