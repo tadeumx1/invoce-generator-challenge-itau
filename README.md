@@ -348,8 +348,12 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
    → Jaeger (local) / X-Ray (AWS). Operator reference:
    [`docs/observability.md`](docs/observability.md). Local stack adds Jaeger to the
    compose file (UI on `localhost:16686`).
-8. **F-AWS** — Terraform for API Gateway HTTP + ECS Fargate + MSK + CloudWatch +
-   X-Ray. Authentication (Cognito/JWT) **documented**, not implemented. **Planned.**
+8. **F-AWS** — Proposal-grade Terraform for API Gateway HTTP + ECS Fargate + MSK +
+   CloudWatch + X-Ray, 5 modules under [`infra/terraform/`](infra/terraform/),
+   validates clean (`terraform fmt + init + validate`). Reviewer-facing architecture
+   write-up at [`docs/aws-architecture.md`](docs/aws-architecture.md) (diagram,
+   services table, ADRs, cost, runbook). Authentication (Cognito vs JWT-verifier)
+   **documented**, not provisioned.
 
 ### Notable architectural decisions
 

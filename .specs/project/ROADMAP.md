@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** M3 — Operations
-**Status:** F-RESILIENCE + F-OBSERVABILITY complete (2026-05-23). Next: F-AWS.
+**Current Milestone:** M3 — Operations (complete)
+**Status:** F-RESILIENCE + F-OBSERVABILITY + F-AWS complete (2026-05-23). Roadmap milestones M1, M2, M3 all closed.
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 
@@ -125,11 +125,14 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 - Every request injects `X-Correlation-Id` so the F-OBSERVABILITY MDC / trace correlation is exercised on every Postman call.
 - Single collection variable `baseUrl` (default `http://localhost:8080`) — no separate environment file needed.
 
-**F-AWS — AWS deployment proposal + Terraform IaC** — PLANNED
+**F-AWS — AWS deployment proposal + Terraform IaC** — COMPLETE (2026-05-23, `terraform fmt -recursive -check + init -backend=false + validate` green across 5 modules; 36 spec requirements ticked; reviewer-facing write-up at `docs/aws-architecture.md`)
 
-- Architecture diagram (ADR + Mermaid): API Gateway → ECS Fargate (default) or Lambda (alt) → Kafka/MSK topics + consumers → CloudWatch (logs + metrics) → X-Ray (traces).
-- Terraform module(s) under `infra/terraform/` provisioning: VPC, ECS cluster + service + task def, API Gateway HTTP API, Kafka/MSK topics or documented managed Kafka alternative, DLQ/retry topics, IAM roles, CloudWatch log groups, dashboards, alarms.
-- AuthN/AuthZ documented at the gateway boundary (Cognito or JWT verifier) — *documented only*, not provisioned, per scope.
+- Proposal-grade Terraform (per the 2026-05-23 user clarification): HCL validates clean but is intentionally not applied against a real AWS account. Going from validate-clean to applyable is one `backend.tf` + IAM bootstrap away; documented in `infra/terraform/README.md`.
+- Architecture: API Gateway HTTP API → VPC Link → internal ALB → ECS Fargate (2 tasks) → MSK (3 × `kafka.t3.small`, SASL/IAM, KMS-encrypted at rest). Observability: CloudWatch Logs (3 log groups) + Micrometer CloudWatch registry pushing to namespace `InvoiceGenerator` + ADOT sidecar → X-Ray (10% sampling).
+- 5 modules under `infra/terraform/modules/`: `network` (VPC + 3+3 subnets + SGs), `msk` (cluster + KMS + broker logs), `ecs` (ECR + cluster + task def with ADOT sidecar + ALB + two scoped IAM roles), `api-gateway` (HTTP API + VPC Link + JSON access logs echoing `X-Correlation-Id`), `observability` (4-SLI CloudWatch dashboard + 4 alarms + X-Ray group + sampling rule).
+- The four SLIs from `docs/observability.md` are re-expressed verbatim as CloudWatch metric math — single source of truth, two query languages.
+- AuthN/AuthZ documented at the gateway boundary (Cognito User Pool vs external JWT verifier comparison) — *documented only*, not provisioned, per scope. ADR-031 captures both paths.
+- Order-of-magnitude monthly cost at idle: ~US$ 300 (dominated by MSK ~US$ 200; documented tightening levers include MSK Serverless + VPC interface endpoints).
 
 ---
 

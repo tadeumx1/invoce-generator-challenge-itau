@@ -103,6 +103,14 @@ The main safety net is 56 fast tests plus the slow profile on demand:
 
 No current tests use Mockito; it is excluded from the test starter to keep Spring tests runnable in restricted JVM environments.
 
+## AWS deployment proposal (F-AWS, complete)
+
+Reviewer-facing architecture write-up (diagram, services table, ADRs, cost, runbook):
+[`docs/aws-architecture.md`](docs/aws-architecture.md). Terraform modules under
+[`infra/terraform/`](infra/terraform/). Gate: `terraform fmt -recursive -check + init
+-backend=false + validate` (proposal-grade — validates clean, not applied against a
+real account).
+
 ## Observability (F-OBSERVABILITY, complete)
 
 Operator-facing reference (SLI catalog, Prometheus queries, runbook):

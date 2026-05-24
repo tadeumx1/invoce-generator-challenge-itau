@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-05-23
-**Current Work:** F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, and F-OBSERVABILITY complete. 88 fast tests passing; `docs/observability.md` published as the operator SSOT (4 SLIs, Prometheus queries, per-SLI runbook). Next up: F-AWS.
+**Current Work:** All eight roadmap features complete (F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS). 88 fast tests still passing; `docs/observability.md` is the operator SSOT and `docs/aws-architecture.md` is the reviewer-facing AWS proposal; 5-module Terraform under `infra/terraform/` validates clean. M3 milestone closed.
 
 ---
 
@@ -195,6 +195,35 @@
 **Reason:** The legacy pattern dropped the interrupt flag, which prevents executors and scheduler pools from shutting down cleanly. Now that the adapter calls run on Kafka consumer threads (which are pooled and need to react to interrupts), the legacy behaviour was an SRE hazard. The typed exception lets Resilience4j and `@RetryableTopic` see a stable exception class while keeping a recognisable type for logs/metrics.
 **Trade-off:** Existing callers must accept `IntegrationAdapterException` as well as plain `RuntimeException`. Since the only callers today are the Kafka consumers (which catch any throwable for retry/DLT), the blast radius is zero.
 **Impact:** C-8 is closed. Future adapters added to `adapter/integration/**` must follow the same pattern; a small code-style note in `CONVENTIONS.md` would be a worthwhile follow-up.
+
+### AD-030: F-AWS scope — proposal-grade Terraform, MSK provisioned, Fargate only (2026-05-23)
+
+**Decision:** F-AWS ships **proposal-grade** Terraform (validates clean with
+`terraform fmt + init + validate`; not applied against a real AWS account). The
+messaging plane is **Amazon MSK** (3 × `kafka.t3.small`, SASL/IAM, KMS at-rest) and
+the compute plane is **ECS Fargate** only — no Lambda alternative. All three choices
+were captured interactively with the user before T1; ADR-029 / ADR-030 / ADR-033 in
+`docs/aws-architecture.md` document them in the reviewer-facing artifact.
+
+**Reason:** Applyable Terraform requires an AWS account + ~US$ 200/mo MSK spend +
+state-backend wiring; out of scope for a challenge project. MSK was kept (instead of
+pivoting to SQS per AD-014) because fidelity with the local Kafka topology — same
+4 topics + retry + DLT shape, no code change — outweighs the cost saving for this
+proposal. Fargate over Lambda because the app holds long-lived Kafka consumer
+threads; Lambda would split the HTTP path from the consumers and break the
+end-to-end trace.
+
+**Trade-off:** No live smoke test; the runbook in `docs/aws-architecture.md`
+documents the steps from validate-clean to first `terraform apply`. The SQS
+alternative is captured as Future Considerations for an SRE team that decides MSK is
+operationally too heavy.
+
+**Impact:** Five-module tree under `infra/terraform/` (network, msk, ecs,
+api-gateway, observability). `terraform fmt -recursive -check + init -backend=false
++ validate` is the new F-AWS gate, analogous to `./mvnw verify` for the Java side.
+The four F-OBSERVABILITY SLIs from `docs/observability.md` are re-expressed as
+CloudWatch metric math verbatim in the `observability` module — SSOT preserved.
+M3 closes with F-AWS.
 
 ### AD-029: F-OBSERVABILITY audit — registered ≠ wired (2026-05-23)
 

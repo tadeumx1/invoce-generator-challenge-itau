@@ -2,7 +2,7 @@
 
 **Design:** `.specs/features/aws/design.md`
 **Spec:** `.specs/features/aws/spec.md`
-**Status:** Draft (2026-05-23)
+**Status:** Done (2026-05-23)
 **Granularity policy:** consolidated vertical slices (5 tasks). Per user preference,
 each task is one atomic commit covering one coherent AWS-plane slice rather than
 per-resource sub-tasks.
@@ -66,11 +66,11 @@ AWS-11, AWS-12, AWS-13, AWS-14, AWS-15.
 
 **Done when:**
 
-- [ ] `~/.local/bin/terraform fmt -recursive -check infra/terraform` exits 0.
-- [ ] `~/.local/bin/terraform -chdir=infra/terraform init -backend=false` exits 0.
-- [ ] `~/.local/bin/terraform -chdir=infra/terraform validate` exits 0.
-- [ ] Root `main.tf` has exactly one `module` block (`network`).
-- [ ] `network` module exports `vpc_id`, `public_subnet_ids`, `private_subnet_ids`,
+- [x] `~/.local/bin/terraform fmt -recursive -check infra/terraform` exits 0.
+- [x] `~/.local/bin/terraform -chdir=infra/terraform init -backend=false` exits 0.
+- [x] `~/.local/bin/terraform -chdir=infra/terraform validate` exits 0.
+- [x] Root `main.tf` has exactly one `module` block (`network`).
+- [x] `network` module exports `vpc_id`, `public_subnet_ids`, `private_subnet_ids`,
       `app_security_group_id`, `msk_security_group_id`, `alb_security_group_id`.
 
 **Tests:** `terraform validate` is the gate.
@@ -105,13 +105,13 @@ in-transit TLS_PLAINTEXT, at-rest CMK), broker logs to a CloudWatch log group wi
 
 **Done when:**
 
-- [ ] `~/.local/bin/terraform fmt -recursive -check` exits 0.
-- [ ] `~/.local/bin/terraform validate` exits 0 with the new module.
-- [ ] `aws_msk_cluster` resource has `client_authentication.sasl.iam = true` and
+- [x] `~/.local/bin/terraform fmt -recursive -check` exits 0.
+- [x] `~/.local/bin/terraform validate` exits 0 with the new module.
+- [x] `aws_msk_cluster` resource has `client_authentication.sasl.iam = true` and
       `client_authentication.unauthenticated = false`.
-- [ ] `encryption_info.encryption_in_transit.client_broker = "TLS_PLAINTEXT"`.
-- [ ] `encryption_info.encryption_at_rest_kms_key_arn` references the local KMS key.
-- [ ] `bootstrap_brokers_sasl_iam` is exposed as a module output.
+- [x] `encryption_info.encryption_in_transit.client_broker = "TLS_PLAINTEXT"`.
+- [x] `encryption_info.encryption_at_rest_kms_key_arn` references the local KMS key.
+- [x] `bootstrap_brokers_sasl_iam` is exposed as a module output.
 
 **Tests:** `terraform validate`.
 **Gate:** `terraform fmt + validate`.
@@ -148,16 +148,16 @@ AWS-25..26.
 
 **Done when:**
 
-- [ ] `~/.local/bin/terraform fmt -recursive -check` exits 0.
-- [ ] `~/.local/bin/terraform validate` exits 0 with the new module.
-- [ ] Task definition has exactly two containers: `app` (`essential = true`) and
+- [x] `~/.local/bin/terraform fmt -recursive -check` exits 0.
+- [x] `~/.local/bin/terraform validate` exits 0 with the new module.
+- [x] Task definition has exactly two containers: `app` (`essential = true`) and
       `aws-otel-collector` (`essential = false`).
-- [ ] App container env contains `KAFKA_BOOTSTRAP_SERVERS`, `OTLP_TRACING_ENDPOINT`,
+- [x] App container env contains `KAFKA_BOOTSTRAP_SERVERS`, `OTLP_TRACING_ENDPOINT`,
       `SPRING_PROFILES_ACTIVE`, `AWS_REGION`.
-- [ ] Task role policy is scoped: `kafka-cluster:*` only on `msk_cluster_arn`,
+- [x] Task role policy is scoped: `kafka-cluster:*` only on `msk_cluster_arn`,
       `cloudwatch:PutMetricData` only on `cloudwatch:namespace = InvoiceGenerator`,
       `xray:Put*` unscoped (per X-Ray docs).
-- [ ] `alb_listener_arn` is exposed as a module output.
+- [x] `alb_listener_arn` is exposed as a module output.
 
 **Tests:** `terraform validate`.
 **Gate:** `terraform fmt + validate`.
@@ -202,15 +202,15 @@ AWS-35, AWS-36.
 
 **Done when:**
 
-- [ ] `~/.local/bin/terraform fmt -recursive -check` exits 0.
-- [ ] `~/.local/bin/terraform validate` exits 0 with both new modules.
-- [ ] Root `outputs.tf` exposes `api_endpoint`.
-- [ ] Dashboard JSON contains exactly four widgets named `SLI-1` / `SLI-2` /
+- [x] `~/.local/bin/terraform fmt -recursive -check` exits 0.
+- [x] `~/.local/bin/terraform validate` exits 0 with both new modules.
+- [x] Root `outputs.tf` exposes `api_endpoint`.
+- [x] Dashboard JSON contains exactly four widgets named `SLI-1` / `SLI-2` /
       `SLI-3` / `SLI-4`.
-- [ ] `aws_cloudwatch_metric_alarm` × 4 exists; each has
+- [x] `aws_cloudwatch_metric_alarm` × 4 exists; each has
       `comparison_operator = "LessThanThreshold"` and a `threshold` matching the SLO
       from the spec (0.995 / 0.99 / 0.999 / 0.95).
-- [ ] `aws_xray_sampling_rule` has `fixed_rate = 0.1` and `priority = 9000`.
+- [x] `aws_xray_sampling_rule` has `fixed_rate = 0.1` and `priority = 9000`.
 
 **Tests:** `terraform validate`.
 **Gate:** `terraform fmt + validate`.
@@ -250,19 +250,19 @@ Work and add the AD-030 entry documenting the proposal-grade decision.
 
 **Done when:**
 
-- [ ] `docs/aws-architecture.md` opens with a Mermaid diagram.
-- [ ] Services table lists every AWS service used by the Terraform with: purpose,
+- [x] `docs/aws-architecture.md` opens with a Mermaid diagram.
+- [x] Services table lists every AWS service used by the Terraform with: purpose,
       local-stack equivalent, link to the Terraform module.
-- [ ] ADRs section has ≥ 4 entries (MSK over SQS, Fargate over Lambda, awslogs over
+- [x] ADRs section has ≥ 4 entries (MSK over SQS, Fargate over Lambda, awslogs over
       Firelens, auth-deferred Cognito vs JWT-verifier).
-- [ ] Cost section gives an order-of-magnitude monthly number with a one-line
+- [x] Cost section gives an order-of-magnitude monthly number with a one-line
       breakdown.
-- [ ] Runbook section fits on one screen: `terraform init/plan/apply` + smoke test.
-- [ ] `infra/terraform/README.md` has the gate command (`terraform fmt + validate`)
+- [x] Runbook section fits on one screen: `terraform init/plan/apply` + smoke test.
+- [x] `infra/terraform/README.md` has the gate command (`terraform fmt + validate`)
       and a deferred-follow-ups list.
-- [ ] `ROADMAP.md` F-AWS PLANNED → COMPLETE (2026-05-23).
-- [ ] `STATE.md` Current Work + AD-030 added.
-- [ ] `.specs/features/aws/tasks.md` Status Draft → Done; every Done-When box ticked.
+- [x] `ROADMAP.md` F-AWS PLANNED → COMPLETE (2026-05-23).
+- [x] `STATE.md` Current Work + AD-030 added.
+- [x] `.specs/features/aws/tasks.md` Status Draft → Done; every Done-When box ticked.
 
 **Tests:** none (documentation + status flips).
 **Gate:** human read-through.
