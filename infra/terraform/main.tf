@@ -29,3 +29,26 @@ module "ecs" {
   aws_region              = var.region
   tags                    = local.common_tags
 }
+
+module "api_gateway" {
+  source = "./modules/api-gateway"
+
+  name_prefix           = local.name_prefix
+  private_subnet_ids    = module.network.private_subnet_ids
+  alb_security_group_id = module.network.alb_security_group_id
+  alb_listener_arn      = module.ecs.alb_listener_arn
+  tags                  = local.common_tags
+}
+
+module "observability" {
+  source = "./modules/observability"
+
+  name_prefix      = local.name_prefix
+  aws_region       = var.region
+  ecs_cluster_name = module.ecs.cluster_name
+  ecs_service_name = module.ecs.service_name
+  api_id           = module.api_gateway.api_id
+  api_stage_name   = module.api_gateway.stage_name
+  msk_cluster_name = module.msk.cluster_name
+  tags             = local.common_tags
+}
