@@ -75,11 +75,24 @@ curl -X POST http://localhost:8080/api/orders/generate-invoice \
   -d @src/main/resources/payloads/teste-pf.json
 ```
 
-> The `payloads/` directory is intentionally misspelled (C-7, deferred). Keep the path
-> as is until C-7 is swept.
-
 The legacy URL `POST /api/pedido/gerarNotaFiscal` is still served as an alias for
 backwards compatibility.
+
+### Postman collection
+
+A Postman v2.1.0 collection at
+[`docs/postman/invoice-generator.postman_collection.json`](docs/postman/invoice-generator.postman_collection.json)
+exercises every documented response shape — 2 happy-paths, the legacy alias, and the 3
+rejection codes (`UNSUPPORTED_TAX_REGIME`, `INVALID_TAX_REGIME`, `INVALID_DELIVERY_REGION`).
+Each request injects `X-Correlation-Id` so the observability MDC + tracing pipeline is
+exercised on every call.
+
+```bash
+# Run the whole collection headless (CLI; no GUI needed)
+npx newman run docs/postman/invoice-generator.postman_collection.json
+```
+
+Defaults to `baseUrl=http://localhost:8080`; override with `--env-var baseUrl=...`.
 
 ### Full Kafka flow via Docker
 
@@ -335,7 +348,7 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
    for dedupe. Local stack via `docker compose up` with Confluent KRaft. **64 fast
    tests + 1 slow + EmbeddedKafka end-to-end.**
 
-### M3 — Operations (in flight)
+### M3 — Operations (complete)
 
 6. **F-RESILIENCE** — Resilience4j `@CircuitBreaker` on each of the four outbound
    adapters with per-port thresholds in `application.properties`. Resolved **C-8**
@@ -353,11 +366,33 @@ feature has a `spec.md` (requirements with stable IDs), optionally a `design.md`
    validates clean (`terraform fmt + init + validate`). Reviewer-facing architecture
    write-up at [`docs/aws-architecture.md`](docs/aws-architecture.md) (diagram,
    services table, ADRs, cost, runbook). Authentication (Cognito vs JWT-verifier)
-   **documented**, not provisioned.
+   **documented**, not provisioned. Resolves the README's *API Gateway / Estratégia
+   de deploy / Contexto AWS / Autenticação/autorização* themes (the last one
+   docs-only by scope).
+9. **F-POSTMAN** — Postman v2.1.0 collection at
+   [`docs/postman/invoice-generator.postman_collection.json`](docs/postman/invoice-generator.postman_collection.json)
+   exercising every documented response shape (2 happy-paths + legacy alias + 3
+   rejection codes). Every request injects `X-Correlation-Id` and asserts the
+   `codigo` contract via `pm.test()`. Runs from the Postman GUI or
+   `npx newman run docs/postman/invoice-generator.postman_collection.json`.
+   Resolves the README's *Documentação mínima para executar, testar e entender a
+   solução* theme on the testability side.
+10. **F-DEPLOY-ACTION** — Proposal-grade GitHub Actions deploy pipeline at
+    [`.github/workflows/deploy-aws.yml`](.github/workflows/deploy-aws.yml). Three
+    chained jobs: `build-and-test` (`./mvnw verify` + JaCoCo artifact) →
+    `terraform-apply` (`fmt -check` → `init` with S3+DynamoDB backend → `validate` →
+    `plan` uploaded as artifact → `apply`) → `docker-deploy` (Buildx push to ECR
+    tagged `${{ github.sha }}` → live task-definition re-render via
+    `aws ecs describe-task-definition` + `jq` → `aws-actions/amazon-ecs-deploy-task-definition@v2`
+    with `wait-for-service-stability` → `curl` smoke test against the API Gateway).
+    AWS auth via GitHub OIDC — no `AWS_ACCESS_KEY_ID` in repo secrets. `on:`
+    triggers commented out so the YAML validates as runnable but never fires
+    against a live account (same posture as F-AWS). Resolves the README's
+    *Planejamento de deploy e operação* theme on the pipeline side.
 
 ### Notable architectural decisions
 
-Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (28 ADRs total):
+Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (31 ADRs total):
 
 - **AD-009** Clean Architecture with adapter-owned JSON DTOs — domain/application are
   free of Spring and Jackson.
@@ -377,6 +412,12 @@ Recorded in [`.specs/project/STATE.md`](.specs/project/STATE.md) (28 ADRs total)
   breakers; `@TimeLimiter` deferred to avoid forcing `CompletableFuture` on every
   port; C-8 fix scoped to introduce `IntegrationAdapterException` and preserve the
   interrupt flag.
+- **AD-030/AD-031** Proposal-grade posture for the AWS side: F-AWS ships Terraform
+  that validates clean but is not applied against a live account; F-DEPLOY-ACTION
+  ships a GitHub Actions workflow with `on:` triggers commented out, using GitHub
+  OIDC for auth and live task-definition re-render (so any Terraform-managed
+  container field — env vars, ADOT sidecar, resource sizes — is preserved across
+  deploys).
 
 ### Where to look for the rest
 

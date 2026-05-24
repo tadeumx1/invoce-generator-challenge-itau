@@ -88,11 +88,12 @@ M1 — Qualidade (3/3) ✅
 M2 — Defeitos funcionais (2/2) ✅
   F-DEFECTS-FUNCTIONAL ✅      F-DEFECTS-PERFORMANCE ✅
 
-M3 — Operações (1/3) 🟡
-  F-RESILIENCE ✅   F-OBSERVABILITY 🟡 (planejado, ready)   F-AWS 🔴
+M3 — Operações (5/5) ✅
+  F-RESILIENCE ✅   F-OBSERVABILITY ✅   F-AWS ✅
+  F-POSTMAN ✅      F-DEPLOY-ACTION ✅
 ```
 
-Legenda: ✅ implementado · 🟡 spec/design/tasks frozen, execução pendente · 🔴 planejado.
+Legenda: ✅ implementado.
 
 ### Problemas atuais → feature responsável
 
@@ -117,23 +118,36 @@ Legenda: ✅ implementado · 🟡 spec/design/tasks frozen, execução pendente 
 | Correção e criação de testes relevantes | **F-SAFETY-NET** | ✅ |
 | Melhor tratamento para pedidos > 6 itens | **F-DEFECTS-PERFORMANCE** (C-6) | ✅ |
 | Java 21 e Spring atualizado | **F-UPGRADE** (Spring Boot 3.5.14) | ✅ |
-| Documentação mínima | **transversal** — `README.md`, `CLAUDE.md`, `docs/business-rules.md`, `docs/translation-changelog.md`, todo o `.specs/` | ✅ |
-| Planejamento de deploy e operação | **F-DEFECTS-PERFORMANCE T4** (Dockerfile + docker-compose) + **F-AWS** | 🟡 Local pronto; AWS planejado |
-| Observabilidade (logs, métricas, tracing) | **F-OBSERVABILITY** | 🟡 Spec + design + tasks frozen, execução pendente |
+| Documentação mínima | **transversal** — `README.md`, `CLAUDE.md`, `docs/business-rules.md`, `docs/observability.md`, `docs/aws-architecture.md`, `docs/translation-changelog.md`, todo o `.specs/` + **F-POSTMAN** (collection executável com `npx newman` cobrindo happy-paths e rejeições) | ✅ |
+| Planejamento de deploy e operação | **F-DEFECTS-PERFORMANCE T4** (Dockerfile + docker-compose) + **F-AWS** (Terraform 5 módulos validate-clean) + **F-DEPLOY-ACTION** (GitHub Actions pipeline com OIDC, triggers comentados) | ✅ |
+| Observabilidade (logs, métricas, tracing) | **F-OBSERVABILITY** | ✅ JSON logs (`logstash-logback-encoder`), Micrometer com 4 SLIs explícitos, OTel tracing → Jaeger local / X-Ray AWS |
 | Resiliência para integrações lentas/instáveis | **F-DEFECTS-PERFORMANCE T3** (retry/DLT + idempotência) + **F-RESILIENCE** (Resilience4j `@CircuitBreaker` + C-8 fix) | ✅ |
 
 ### Proposta de arquitetura → feature responsável
 
 | Item do README | Feature | Status |
 |---|---|---|
-| API Gateway | **F-AWS** | 🔴 Planejado (documentado no spec, não implementado) |
-| Autenticação / autorização | **F-AWS** | 🔴 Planejado (Cognito/JWT documentado apenas, não provisionado — escopo definido em `.specs/project/PROJECT.md`) |
+| API Gateway | **F-AWS** | ✅ API Gateway HTTP API + VPC Link + internal ALB (módulo `infra/terraform/modules/api-gateway`); access logs JSON ecoando `X-Correlation-Id` |
+| Autenticação / autorização | **F-AWS** | 🟡 Documentado no `docs/aws-architecture.md` (ADR-031: Cognito User Pool vs JWT verifier externo) — não provisionado por escopo |
 | APIs externas ou internas consumidas | **F-CLEAN** (ports) + **F-DEFECTS-PERFORMANCE** (eventos Kafka) | ✅ Domain ports + 4 tópicos Kafka definidos |
 | Tratamento de integrações lentas | **F-DEFECTS-PERFORMANCE** + **F-RESILIENCE** | ✅ Kafka async dispatch + `@RetryableTopic` + DLT; `@CircuitBreaker` por adapter (Resilience4j 2.2.0) |
 | Filas / processamento assíncrono | **F-DEFECTS-PERFORMANCE** | ✅ 4 tópicos `invoice.*.v1` + retry topics + DLT, consumers em grupos isolados |
-| Observabilidade | **F-OBSERVABILITY** | 🟡 4 SLIs explícitos (success rate, p99 latency, Kafka dispatch, side-effect end-to-end) |
-| Estratégia de deploy | **F-DEFECTS-PERFORMANCE T4** + **F-AWS** | 🟡 Dockerfile + docker-compose KRaft prontos; Terraform para ECS/MSK no F-AWS |
-| Contexto AWS | **F-AWS** | 🔴 Planejado — API Gateway HTTP → ECS Fargate → MSK + DLQ topics → CloudWatch + X-Ray |
+| Observabilidade | **F-OBSERVABILITY** + **F-AWS** | ✅ 4 SLIs (success rate, p99 latency, Kafka dispatch, side-effect end-to-end) implementados em Micrometer; CloudWatch dashboard + 4 alarmes no F-AWS reusam as mesmas definições verbatim |
+| Estratégia de deploy | **F-DEFECTS-PERFORMANCE T4** + **F-AWS** + **F-DEPLOY-ACTION** | ✅ Dockerfile + docker-compose KRaft (local) + Terraform 5 módulos (AWS) + pipeline GitHub Actions com OIDC, 3 jobs (verify → terraform apply → ECR push + ECS rolling deploy + smoke test) |
+| Contexto AWS | **F-AWS** | ✅ Proposal-grade: API Gateway HTTP → VPC Link → internal ALB → ECS Fargate (2 tasks) → MSK (3 × `kafka.t3.small`, SASL/IAM, KMS) + CloudWatch dashboards/alarmes + X-Ray (10 % sampling); `terraform fmt + init + validate` green em 5 módulos |
+
+### Features de M3 — o que cada uma cobre do desafio
+
+As três features de fechamento de M3 endereçam diretamente os itens "Documentação", "Planejamento de deploy" e "Contexto AWS" da seção **O que considerar na solução** + **Proposta de arquitetura**:
+
+- **F-POSTMAN** → cobre **"Documentação mínima para executar, testar e entender a solução"**.
+  Collection v2.1.0 em `docs/postman/invoice-generator.postman_collection.json` com 6 requisições — 2 happy-paths (`teste-pf.json`, `teste-pj-simples.json`), 1 alias legado (`POST /api/pedido/gerarNotaFiscal`), 3 rejeições contratuais (`UNSUPPORTED_TAX_REGIME`, `INVALID_TAX_REGIME`, `INVALID_DELIVERY_REGION`). Cada request injeta `X-Correlation-Id` e tem `pm.test()` validando código + corpo. Roda no Postman ou via `npx newman run docs/postman/invoice-generator.postman_collection.json`.
+
+- **F-AWS** → cobre **"Contexto AWS"** + **"API Gateway"** + **"Estratégia de deploy"** + **"Autenticação/autorização"** (documentada).
+  Terraform proposal-grade com 5 módulos (`network`, `msk`, `ecs`, `api-gateway`, `observability`) — `terraform fmt + init + validate` green. Write-up para reviewer em `docs/aws-architecture.md` (diagrama Mermaid, tabela de serviços, ADRs, custo mensal ~US$ 300, runbook). Os 4 SLIs do F-OBSERVABILITY são re-expressos verbatim como metric math no dashboard CloudWatch — única fonte de verdade, duas linguagens de query.
+
+- **F-DEPLOY-ACTION** → cobre **"Planejamento de deploy e operação"** do lado de pipeline.
+  Workflow GitHub Actions em `.github/workflows/deploy-aws.yml` com 3 jobs: `build-and-test` (`./mvnw verify` + JaCoCo artifact) → `terraform-apply` (`fmt -check` → `init` com S3+DynamoDB → `validate` → `plan` como artifact → `apply`) → `docker-deploy` (Buildx → ECR tag `${{ github.sha }}` → re-render da task-def viva via `aws ecs describe-task-definition` + `jq` → `aws-actions/amazon-ecs-deploy-task-definition@v2` com `wait-for-service-stability` → smoke test `curl` na API Gateway). Auth via GitHub OIDC — sem `AWS_ACCESS_KEY_ID` no repo. Triggers comentados (mesma postura proposal-grade do F-AWS — valida como YAML executável mas não dispara contra conta real).
 
 ### Onde olhar
 
