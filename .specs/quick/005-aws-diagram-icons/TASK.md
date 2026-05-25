@@ -1,43 +1,64 @@
-# Quick Task 005 — AWS icons in architecture mermaid diagrams
+# Quick Task 005 — AWS icons for architecture diagrams in draw.io
 
 **Feature:** F-AWS.
-**Scope:** Visual fidelity of `docs/aws-architecture-diagram.md` when rendered.
+**Scope:** Visual fidelity of architecture diagrams when presented in draw.io.
 
 ## Why
 
-When the mermaid source from `docs/aws-architecture-diagram.md` is pasted into
-draw.io (the user's actual presentation flow), the rendered diagrams show generic
-colored rectangles instead of recognizable AWS service icons. The Main and Structural
-diagrams therefore lose their primary affordance — letting a reviewer recognize each
-component at a glance.
+The mermaid blocks in `docs/aws-architecture-diagram.md` render in draw.io as
+generic colored rectangles. Presenters using draw.io as their canvas lose the
+"at-a-glance" recognition the AWS icon set provides.
 
-The "modern" mermaid answer (`architecture-beta` + `logos:aws-*` icons) does not solve
-this: it requires the renderer to pre-register an iconify icon pack via JavaScript at
-boot, and neither draw.io's bundled mermaid nor the free mermaid.live playground does
-that. Confirmed empirically on 2026-05-25 — pasting an `architecture-beta` block with
-`logos:aws-api-gateway` into mermaid.live renders a `?` placeholder.
+Two source-side workarounds were investigated and ruled out empirically on
+2026-05-25:
+
+- `architecture-beta` + iconify (`logos:aws-*` / `aws:*`) — mermaid.live (free)
+  does not pre-register the icon packs, so every icon falls back to `?`.
+  Confirmed by pasting a test block into mermaid.live. draw.io's mermaid also
+  does not parse `architecture-beta`.
+- `flowchart LR` + inline `<img>` tags pointing at AWS official icons on
+  `icon.icepanel.io` — draw.io's mermaid importer sanitizes the HTML, so the
+  `<img>` markup is shown as literal text. Confirmed by pasting into draw.io.
+
+Conclusion: AWS iconography cannot be embedded in mermaid in a way that
+survives draw.io's importer. A native `.drawio` file using the built-in AWS
+shape stencils is the only path that puts real AWS icons on the draw.io
+canvas.
 
 ## What ships
 
-- Rewrite **Main Diagram** to `flowchart LR` with inline `<img src='...' />` tags
-  pointing at AWS official architecture icons hosted on `icon.icepanel.io` (public CDN
-  mirror of AWS's freely licensed architecture icons).
-- Rewrite **Diagram 1 — Structural** the same way: every AWS service node gets its
-  official icon (API Gateway, VPC, ELB, Fargate, MSK, ECR, KMS, CloudWatch, X-Ray).
-- Add `%%{init: {'securityLevel': 'loose'}}%%` directive at the top of each rewritten
-  block so renderers that default to strict mode still allow HTML labels.
-- Leave **Diagram 2 — Sequence** untouched — sequence diagrams describe interaction
-  order, not topology, and icons would add noise without information.
-- Drop the now-redundant `classDef` color buckets from the two rewritten diagrams
-  (icons replace the visual role color was playing).
-- Add a short "Rendering" note in the doc explaining where the icons come from and that
-  no iconify pack registration is needed.
+- New file `docs/aws-architecture-diagrams.drawio` with four pages, one per
+  mermaid diagram in the project:
+  - **Main** (from `aws-architecture-diagram.md`) — Client + AWS group with
+    API Gateway, Fargate, MSK, CloudWatch nodes.
+  - **Structural** (from `aws-architecture-diagram.md`) — Client + AWS
+    region/VPC group with API Gateway, VPC Link, ALB, ECS Fargate sub-group
+    (app + ADOT/X-Ray), MSK sub-group (3 brokers), ECR, KMS, and a Managed
+    Observability sub-group (CloudWatch Logs/Metrics/Dashboard + X-Ray).
+  - **Sequence** (from `aws-architecture-diagram.md`) — 6 participants
+    (Client, API Gateway, Fargate app, MSK, KafkaListeners, CloudWatch/X-Ray)
+    with AWS icons on each participant header, lifelines, 15 numbered
+    messages, two notes, and a `par` block for the async consumption fan-out.
+  - **Architecture (reviewer)** (from `aws-architecture.md`) — variant
+    structural view matching the reviewer write-up's labels (no ADR-032
+    callout on API Gateway; "3 private subnets" on ALB; explicit Client
+    subgraph; per-broker `encrypts` edges from KMS).
+- All shapes use `mxgraph.aws4.resourceIcon` with the verified canonical
+  stencil names (`api_gateway`, `fargate`, `managed_streaming_for_kafka`,
+  `cloudwatch`, `cloudwatch_logs`, `xray`, `ecr`, `key_management_service`,
+  `virtual_private_cloud`, `application_load_balancer`).
+- The mermaid blocks in `docs/aws-architecture-diagram.md` and
+  `docs/aws-architecture.md` are reverted to the original `classDef`-colored
+  versions so they render cleanly on GitHub.
+- A short callout at the top of each affected doc points presenters at the
+  `.drawio` file and explains why mermaid alone can't carry the AWS icons
+  through draw.io.
 
 ## Done when
 
-- The two rewritten mermaid blocks parse cleanly in mermaid.live with AWS icons visible.
-- Pasting either block into draw.io renders the AWS icons inline (manual verification
-  in draw.io).
-- Sequence diagram is byte-identical to before.
-- All 10 referenced icon URLs return HTTP 200.
-- No reader-side iconify pack registration required.
+- `docs/aws-architecture-diagrams.drawio` opens in draw.io showing four pages
+  with real AWS icons on the canvas.
+- The mermaid blocks in `aws-architecture-diagram.md` and
+  `aws-architecture.md` are byte-identical to the pre-task baseline.
+- Presenter callouts added in both docs and links resolve.
+- No iconify pack registration required by the reader.

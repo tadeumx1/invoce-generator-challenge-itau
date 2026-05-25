@@ -13,6 +13,12 @@ Operator-facing SLI catalog (reused below): [`docs/observability.md`](observabil
 
 ## Architecture diagram
 
+> **For presentation with real AWS icons:** open
+> [`aws-architecture-diagrams.drawio`](aws-architecture-diagrams.drawio) →
+> "Architecture (reviewer)" page (uses native `mxgraph.aws4.*` AWS stencils).
+> The mermaid block below is the canonical, version-controlled source for
+> GitHub rendering.
+
 ```mermaid
 graph LR
   subgraph Client
