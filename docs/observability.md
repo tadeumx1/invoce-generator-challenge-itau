@@ -176,6 +176,62 @@ in-memory registry and fails if any meter carries one of the forbidden tags.
 
 ---
 
+## Debug logs catalog (F-DEBUG-LOGS)
+
+F-OBSERVABILITY ships the *MDC + JSON encoder* plumbing; F-DEBUG-LOGS layers structured
+`info` / `debug` / `warn` log lines on top so a CloudWatch operator can reconstruct a
+production incident from logs alone (no metrics or traces required). Every line below
+inherits `correlationId`, `traceId`, `spanId`, `invoiceId`, `orderId` from the F-OBSERVABILITY
+MDC. AD-020 cardinality budget is unchanged — these identifiers ride logs and trace
+attributes only, never metric tags.
+
+| Logger | Level | Message prefix | Fires when |
+| --- | --- | --- | --- |
+| `InvoiceController` | INFO | `invoice request received` | controller entry, per HTTP request |
+| `InvoiceController` | INFO | `invoice request completed` | controller exit on HTTP 200, with `elapsedMs` |
+| `ApiExceptionHandler` | WARN | `invoice request rejected` | domain rejection — HTTP 400, with `codigo` |
+| `ApiExceptionHandler` | WARN | `login rejected` | auth failure — HTTP 401 / 400 |
+| `ApiExceptionHandler` | INFO | `request throttled` | rate-limit AOP path — HTTP 429 (annotation route) |
+| `GenerateInvoiceInteractor` | INFO | `invoice generation begin` / `complete` | use-case begin / end |
+| `TaxRateTable` | DEBUG | `tax bracket selected` | bracket resolution, with `personType`, `taxRegime`, `totalItemsValue`, `rate` |
+| `TaxRateTable` | INFO | `invoice rejected at tax bracket selection` | `INVALID_PERSON_TYPE` / `INVALID_TAX_REGIME` / `UNSUPPORTED_TAX_REGIME` |
+| `LegacyFreightCalculator` | DEBUG | `freight calculated` | freight resolution, with `region`, `baseFreight`, `multiplier`, `adjustedFreight` |
+| `LegacyFreightCalculator` | INFO | `freight rejected` | `INVALID_DELIVERY_REGION` |
+| `*IntegrationAdapter` (× 4) | DEBUG | `adapter enter` / `adapter ok` | outbound port enter / exit, with `port`, `invoiceId`, `elapsedMs` |
+| `*IntegrationAdapter` (× 4) | WARN | `adapter fail` | outbound port failure, with `exceptionClass`, `reason` |
+| `IntegrationEventPublisher` | DEBUG | `kafka publish ok` | producer ack, with `topic`, `eventId`, `partition`, `offset` |
+| `IntegrationEventPublisher` | WARN | `kafka publish fail` | producer timeout / interrupt, with `exceptionClass` |
+| `ResilienceEventLogger` | WARN | `circuit breaker state transition` | CB transition to `OPEN`, with `name`, `from`, `to` |
+| `ResilienceEventLogger` | INFO | `circuit breaker state transition` | CB transition to `HALF_OPEN` / `CLOSED` |
+| `ResilienceEventLogger` | WARN | `bulkhead rejected` | bulkhead permit denied, with `name` |
+| `RateLimitFilter` | INFO | `rate-limit tripped` | per-IP bucket rejection — HTTP 429 (filter route) |
+
+### Runtime log-level toggling
+
+The application package logger `br.com.itau.invoicegenerator` defaults to **INFO**. Two
+ways to flip it to DEBUG without code changes:
+
+1. **Env var at container start (requires restart):**
+   ```bash
+   APP_LOG_LEVEL=DEBUG docker compose up
+   ```
+   `logback-spring.xml` reads the env var and applies it to the application package only;
+   the root level (and Spring / Kafka library logs) stays at INFO.
+
+2. **Actuator at runtime (no restart):**
+   ```bash
+   curl -X POST http://localhost:8080/actuator/loggers/br.com.itau.invoicegenerator \
+     -H 'Content-Type: application/json' \
+     -d '{"configuredLevel":"DEBUG"}'
+   ```
+   POST `null` to revert to the parent level.
+
+DEBUG roughly **6× the log volume per request** (tax-bracket + freight + 4× adapter
+enter/exit + Kafka publish ok lines that are otherwise silent). Flip it for one request,
+read what you need, flip it back — cardinality cost on CloudWatch storage adds up fast.
+
+---
+
 ## Verifying the SLIs against a running app
 
 ```bash

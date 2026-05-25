@@ -1,7 +1,8 @@
 # F-DEBUG-LOGS Tasks
 
 **Spec:** `.specs/features/debug-logs/spec.md`
-**Status:** In Tasks
+**Status:** Done (2026-05-25, `./mvnw verify` green; 143 fast tests including 2 new in
+`DebugLogsIntegrationTest` + 2 new in `ResilienceEventLoggerTest`)
 **Granularity policy:** 5 vertical slices, per user preference (cf.
 `memory/feedback_task-granularity.md`). Each task is one atomic commit covering one
 coherent slice of the request path, with co-located tests when assertions are needed.

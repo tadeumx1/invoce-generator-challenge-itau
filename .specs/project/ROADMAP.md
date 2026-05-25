@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** M7 — AWS observability backend wiring (planned, not started)
-**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH). M5 closed (2026-05-24, F-RATELIMIT; patch 2026-05-25, F-COMPOSE-HEALTHCHECK). M6 closed (2026-05-24, F-BULKHEAD + F-API-DOCS). M7 specced 2026-05-25 (F-CLOUDWATCH-METRICS — `.specs/features/cloudwatch-metrics/`). **Next:** F-CLOUDWATCH-METRICS T1 — add `io.micrometer:micrometer-registry-cloudwatch2` dependency to `pom.xml` (verifies REQ-1; gate `./mvnw verify`).
+**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH). M5 closed (2026-05-24, F-RATELIMIT; patch 2026-05-25, F-COMPOSE-HEALTHCHECK). M6 closed (2026-05-24, F-BULKHEAD + F-API-DOCS). M7 specced 2026-05-25 (F-CLOUDWATCH-METRICS — `.specs/features/cloudwatch-metrics/`). M8 closed (2026-05-25, F-DEBUG-LOGS). **Next:** F-CLOUDWATCH-METRICS T1 — add `io.micrometer:micrometer-registry-cloudwatch2` dependency to `pom.xml` (verifies REQ-1; gate `./mvnw verify`).
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 
@@ -241,7 +241,7 @@ cardinality budget preserved.
 
 ### Features
 
-**F-DEBUG-LOGS — Structured debug/info logs across controller + interactor + domain + adapters + resilience events** — PLANNED (2026-05-25, spec + tasks drafted under `.specs/features/debug-logs/`; not implemented)
+**F-DEBUG-LOGS — Structured debug/info logs across controller + interactor + domain + adapters + resilience events** — COMPLETE (2026-05-25, `./mvnw verify` green; 141 fast tests including `DebugLogsIntegrationTest` (2) + `ResilienceEventLoggerTest` (2); AD-037 + AD-036 amendment in STATE.md)
 
 - 23 requirements (DLG-01..DLG-23) across HTTP entry/exit bracketing, domain decision tracing (tax bracket selection, freight region/multiplier, validation rejections), outbound adapter enter/exit/fail logs, Kafka publisher failure WARN, Resilience4j circuit-breaker + bulkhead event listeners, and rate-limit trip promotion to INFO.
 - 5 vertical-slice tasks (T1 HTTP path · T2 domain decisions · T3 adapters + Kafka · T4 resilience events · T5 tests + `APP_LOG_LEVEL` env-var binding + `docs/observability.md` catalog).

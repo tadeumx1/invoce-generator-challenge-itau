@@ -5,10 +5,15 @@
   invoiceId / orderId are included by name; everything else stays out so we do not
   accidentally leak payload data.
   Stack traces serialize as the standard "stack_trace" field (single JSON value).
+
+  F-DEBUG-LOGS T5 — runtime log-level toggling via env var APP_LOG_LEVEL (default INFO).
+  Set APP_LOG_LEVEL=DEBUG at container start to flip the application package to DEBUG
+  without a rebuild. /actuator/loggers POST also works without a restart.
 -->
 <configuration>
 
   <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="invoice-generator"/>
+  <property name="APP_LOG_LEVEL" value="${APP_LOG_LEVEL:-INFO}"/>
 
   <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="net.logstash.logback.encoder.LogstashEncoder">
@@ -25,5 +30,5 @@
     <appender-ref ref="JSON"/>
   </root>
 
-  <logger name="br.com.itau.invoicegenerator" level="INFO"/>
+  <logger name="br.com.itau.invoicegenerator" level="${APP_LOG_LEVEL}"/>
 </configuration>

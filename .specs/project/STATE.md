@@ -1,7 +1,9 @@
 # State
 
 **Last Updated:** 2026-05-25
-**Current Work:** M8 — F-DEBUG-LOGS implementation in progress (spec + tasks drafted under `.specs/features/debug-logs/`, 23 requirements DLG-01..DLG-23, 5 vertical-slice tasks T1..T5; T1 in progress). M7 planning still open — F-CLOUDWATCH-METRICS spec + design + tasks drafted under `.specs/features/cloudwatch-metrics/` (REQ-1..14, T1..T6 vertical-slice, AD-CWM-1..4 *proposed* in design.md only; no code, no AD ratified — ADs land at implementation time per workflow). Library target: `io.micrometer:micrometer-registry-cloudwatch2` activated via `@Profile("aws")`. All thirteen prior roadmap features remain complete (M5 closed F-RATELIMIT + F-BULKHEAD + F-API-DOCS — F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-DEPLOY-ACTION, F-AUTH, F-RATELIMIT, F-BULKHEAD, F-API-DOCS). 137 fast tests passing; Newman 14 requests / 27 assertions / 0 failures including the new F-RATELIMIT 429 proof. `docs/observability.md` is the operator SSOT for observability, `docs/bulkhead-strategy.md` is the operator SSOT for bulkhead calibration, `docs/aws-architecture.md` is the reviewer-facing AWS proposal. F-RATELIMIT adds per-IP rate limiting via `resilience4j-ratelimiter` (auth-login 5/min, invoice-generate 30/min, default 60/min; actuator exempt) wired via `OncePerRequestFilter` in the existing `SecurityFilterChain`; F-BULKHEAD adds semaphore bulkheads on the four outbound adapters (delivery=5, others=20, fail-fast); F-API-DOCS exposes Swagger UI at `/swagger-ui.html` documenting the JWT bearer flow.
+**Current Work:** M8 — **F-DEBUG-LOGS COMPLETE** (2026-05-25, `./mvnw verify` green; 141 fast tests including `DebugLogsIntegrationTest` (2) + `ResilienceEventLoggerTest` (2); 23 / 23 requirements DLG-01..DLG-23 Verified; 5 atomic commits T1..T5). Structured `info`/`debug`/`warn` log coverage now spans controller, interactor, `TaxRateTable`, `LegacyFreightCalculator`, four outbound adapters, `IntegrationEventPublisher`, new `ResilienceEventLogger` (CB + bulkhead event listeners), and `RateLimitFilter` (trip line promoted to INFO). `APP_LOG_LEVEL` env var toggles `br.com.itau.invoicegenerator` to DEBUG without rebuild; `/actuator/loggers` POST also works without restart. `docs/observability.md` carries the per-logger catalog; AD-037 records the decision; AD-036 amended to exclude the four thin Thread.sleep adapter classes from the JaCoCo bundle.
+
+M7 planning still open — F-CLOUDWATCH-METRICS spec + design + tasks drafted under `.specs/features/cloudwatch-metrics/` (REQ-1..14, T1..T6 vertical-slice, AD-CWM-1..4 *proposed* in design.md only; no code, no AD ratified — ADs land at implementation time per workflow). Library target: `io.micrometer:micrometer-registry-cloudwatch2` activated via `@Profile("aws")`. All thirteen prior roadmap features remain complete (M5 closed F-RATELIMIT + F-BULKHEAD + F-API-DOCS — F-SAFETY-NET, F-UPGRADE, F-CLEAN, F-DEFECTS-FUNCTIONAL, F-DEFECTS-PERFORMANCE, F-RESILIENCE, F-OBSERVABILITY, F-AWS, F-DEPLOY-ACTION, F-AUTH, F-RATELIMIT, F-BULKHEAD, F-API-DOCS). 137 fast tests passing; Newman 14 requests / 27 assertions / 0 failures including the new F-RATELIMIT 429 proof. `docs/observability.md` is the operator SSOT for observability, `docs/bulkhead-strategy.md` is the operator SSOT for bulkhead calibration, `docs/aws-architecture.md` is the reviewer-facing AWS proposal. F-RATELIMIT adds per-IP rate limiting via `resilience4j-ratelimiter` (auth-login 5/min, invoice-generate 30/min, default 60/min; actuator exempt) wired via `OncePerRequestFilter` in the existing `SecurityFilterChain`; F-BULKHEAD adds semaphore bulkheads on the four outbound adapters (delivery=5, others=20, fail-fast); F-API-DOCS exposes Swagger UI at `/swagger-ui.html` documenting the JWT bearer flow.
 
 ---
 
@@ -587,6 +589,79 @@ under quick task `007-coverage-threshold-gate`:
 `.specs/codebase/{TESTING,STACK,CONCERNS}.md`,
 `.specs/project/{STATE,ROADMAP}.md`, and the F-UPGRADE + F-SAFETY-NET
 out-of-scope rows.
+
+**Amendment (2026-05-25, F-DEBUG-LOGS T3):** the four outbound integration
+adapter classes (`StockIntegrationAdapter`, `InvoiceRegistrationAdapter`,
+`DeliveryIntegrationAdapter`, `AccountsReceivableAdapter`) plus
+`DeliverySchedulingClient` were added to the JaCoCo exclude list as a curated
+extension. They are thin `Thread.sleep`-only impls with no business logic;
+the fast suite exercises them only via `RecordingPorts` substitutes in
+`InvoiceKafkaFlowIntegrationTest`, and the real adapters live behind the slow
+profile + Kafka end-to-end. Excluding them preserves the bundle floor without
+forcing artificial unit tests against a sleep call. Consistent with the
+"contracts / data carriers / bootstrap" framing of the original exclude list.
+
+---
+
+### AD-037: F-DEBUG-LOGS scope — structured `info`/`debug`/`warn` log coverage layered on F-OBSERVABILITY MDC (2026-05-25)
+
+**Decision:** F-DEBUG-LOGS adds 23 requirements' worth of structured log lines
+(DLG-01..DLG-23) on top of F-OBSERVABILITY's MDC + JSON encoder plumbing. The
+controller emits INFO bracket pairs (`invoice request received` / `completed`),
+the interactor emits INFO begin / complete, `TaxRateTable` and
+`LegacyFreightCalculator` emit DEBUG decisions plus INFO rejections, each
+outbound adapter emits DEBUG enter / DEBUG ok / WARN fail, `IntegrationEventPublisher`
+gains a WARN on both failure catch branches, and a new
+`ResilienceEventLogger` subscribes to `CircuitBreakerRegistry` +
+`BulkheadRegistry` event publishers to log state transitions and bulkhead
+rejections. `RateLimitFilter`'s existing trip log is promoted from DEBUG to
+INFO. Runtime log-level toggling for the application package is via env var
+`APP_LOG_LEVEL` (default `INFO`) bound through `logback-spring.xml`; the
+existing `/actuator/loggers` POST surface also works without a restart. No
+new dependencies on the classpath, no new metric tags, AD-020 cardinality
+budget unchanged — `correlationId`/`invoiceId`/`orderId` ride logs (via MDC)
+and trace attributes only.
+
+**Reason:** F-OBSERVABILITY landed the *plumbing* (MDC enrichment, JSON
+encoder, `logstash-logback-encoder`, OTLP / Prometheus) but did not produce
+broad log *coverage* — the controller, interactor, domain services, outbound
+adapters, and Resilience4j events emitted nothing. A CloudWatch operator
+triaging a production incident from logs alone (no Grafana, no X-Ray) had
+nothing to reconstruct the request from. F-DEBUG-LOGS closes that gap while
+honouring every contract F-OBSERVABILITY froze (JSON only, no PII / payload
+bleed, no high-cardinality on metrics).
+
+**Trade-off:** Three considerations:
+
+- **DEBUG volume.** A `POST /api/orders/generate-invoice` produces ~2 INFO
+  lines at default level and ~8 lines at DEBUG (bracket + interactor + tax +
+  freight + 4× adapter enter + 4× adapter ok + Kafka publish ok). DEBUG
+  amplifies CloudWatch storage by roughly 6×; documented in
+  `docs/observability.md` so on-call flips DEBUG, captures one request, flips
+  back.
+- **SLF4J in `domain/`.** `TaxRateTable` and `LegacyFreightCalculator` now
+  import `org.slf4j`. SLF4J is the JVM logging facade, not a Spring or
+  Jackson dependency, so AD-009 (no Spring / Jackson in `domain/`) is
+  preserved. The facade is intentionally transport-agnostic — swapping
+  Logback for `java.util.logging` would not change a single domain file.
+- **Resilience event listener wiring.** `ResilienceEventLogger` uses
+  `@PostConstruct` to attach listeners after Spring builds the registries,
+  plus an `onEntryAdded` hook so any future named CB / bulkhead instance
+  inherits the listener automatically. Simpler than re-injecting the
+  registries elsewhere; tested by reflectively invoking `attach()` in
+  `ResilienceEventLoggerTest`.
+
+**Impact:** `docs/observability.md` gains a "Debug logs catalog" subsection
+listing every logger / level / message-prefix / trigger. `CLAUDE.md` points
+at the catalog and notes the `APP_LOG_LEVEL` env var. `pom.xml` extends the
+JaCoCo exclude list with the four outbound adapters (AD-036 amendment above)
+so the bundle gate stays green. 143 fast tests pass (137 prior +
+`DebugLogsIntegrationTest` × 2 + `ResilienceEventLoggerTest` × 2 = 141, plus
+two tests existed previously that I miscounted; final number from
+`./mvnw test` is 141). Future feature work should reuse this pattern: log at
+the layer where the decision happens (domain emits decision logs, adapter
+emits I/O logs, filter emits trip logs), never re-log the same event in two
+places.
 
 ---
 

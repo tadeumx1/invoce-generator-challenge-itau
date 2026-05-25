@@ -149,10 +149,18 @@ Reviewer-facing architecture write-up (diagram, services table, ADRs, cost, runb
 -backend=false + validate` (proposal-grade — validates clean, not applied against a
 real account).
 
-## Observability (F-OBSERVABILITY, complete)
+## Observability (F-OBSERVABILITY, complete; F-DEBUG-LOGS layered on top)
 
-Operator-facing reference (SLI catalog, Prometheus queries, runbook):
-[`docs/observability.md`](docs/observability.md).
+Operator-facing reference (SLI catalog, Prometheus queries, runbook, **debug logs
+catalog**): [`docs/observability.md`](docs/observability.md).
+
+F-DEBUG-LOGS adds structured `info`/`debug`/`warn` log coverage across the HTTP
+request path (controller, interactor, tax-bracket, freight, outbound adapters, Kafka
+publisher, Resilience4j events, rate-limit trips). Runtime log level for the
+`br.com.itau.invoicegenerator` package is controlled by env var `APP_LOG_LEVEL`
+(default `INFO`); `POST /actuator/loggers/br.com.itau.invoicegenerator` flips it
+without a restart. See [`docs/observability.md`](docs/observability.md) §"Debug logs
+catalog" for the per-logger contract and AD-037 in `STATE.md` for the decision log.
 
 The spec at `.specs/features/observability/spec.md` freezes four SLIs that every Micrometer
 counter, timer, and histogram in this codebase exists to serve:

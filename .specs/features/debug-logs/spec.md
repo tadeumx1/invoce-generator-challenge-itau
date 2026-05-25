@@ -27,22 +27,22 @@ contract already frozen by F-OBSERVABILITY. No new dependencies. No new metric t
 
 ## Goals
 
-- [ ] HTTP request entry and exit are logged with `orderId`, item count, response status,
+- [x] HTTP request entry and exit are logged with `orderId`, item count, response status,
       and request latency.
-- [ ] The use-case execution is bracketed by INFO logs noting begin/end.
-- [ ] Domain decisions (tax bracket selected, freight region multiplier, validation
+- [x] The use-case execution is bracketed by INFO logs noting begin/end.
+- [x] Domain decisions (tax bracket selected, freight region multiplier, validation
       rejections) are logged at DEBUG (decisions) or INFO (rejections) with code +
       reason.
-- [ ] Outbound integration adapters log enter (DEBUG), exit-ok (DEBUG), and exit-fail
+- [x] Outbound integration adapters log enter (DEBUG), exit-ok (DEBUG), and exit-fail
       (WARN with exception class).
-- [ ] Kafka producer dispatch keeps the existing DEBUG line plus a new WARN on failure.
-- [ ] Resilience4j circuit-breaker state transitions and bulkhead rejections are logged
+- [x] Kafka producer dispatch keeps the existing DEBUG line plus a new WARN on failure.
+- [x] Resilience4j circuit-breaker state transitions and bulkhead rejections are logged
       via event publishers (WARN on open / rejected, INFO on close / half-open).
-- [ ] Rate-limit trips are promoted from DEBUG to INFO so they surface in default
+- [x] Rate-limit trips are promoted from DEBUG to INFO so they surface in default
       CloudWatch log groups.
-- [ ] Log levels are configurable via env var so production can dial DEBUG on / off without
+- [x] Log levels are configurable via env var so production can dial DEBUG on / off without
       a rebuild.
-- [ ] No payload bodies, no PII, no `valor_total_itens`-as-cents-of-customers — only
+- [x] No payload bodies, no PII, no `valor_total_itens`-as-cents-of-customers — only
       already-allowed MDC fields and the metric-cardinality tag set.
 
 ## Out of Scope
@@ -234,33 +234,33 @@ that lists which loggers emit what, at which level, and how to read the JSON env
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| DLG-01 | P1: INFO log on controller entry with orderId + itemCount | Specified | Planned |
-| DLG-02 | P1: INFO log on controller exit with invoiceId + status + elapsed-ms | Specified | Planned |
-| DLG-03 | P1: WARN/ERROR log in ApiExceptionHandler with codigo + status | Specified | Planned |
-| DLG-04 | P1: MDC carries correlationId/traceId/spanId on all log lines | Specified | Planned |
-| DLG-05 | P1: DEBUG log on tax bracket selection (personType, regime, rate) | Specified | Planned |
-| DLG-06 | P1: INFO log on TaxRateTable rejection with codigo | Specified | Planned |
-| DLG-07 | P1: DEBUG log on freight calculation with region + multiplier | Specified | Planned |
-| DLG-08 | P1: INFO log on LegacyFreightCalculator rejection with codigo | Specified | Planned |
-| DLG-09 | P1: Domain logs respect cardinality budget; no orderId in message body | Specified | Planned |
-| DLG-10 | P1: DEBUG enter log on each outbound adapter (4 adapters) | Specified | Planned |
-| DLG-11 | P1: DEBUG exit-ok log with elapsed-ms on each outbound adapter | Specified | Planned |
-| DLG-12 | P1: WARN log on adapter failure with exception class + message | Specified | Planned |
-| DLG-13 | P1: Existing IntegrationEventPublisher DEBUG ok line preserved | Specified | Planned |
-| DLG-14 | P1: WARN log on IntegrationEventPublisher failure | Specified | Planned |
-| DLG-15 | P2: WARN log on CB transition to OPEN | Specified | Planned |
-| DLG-16 | P2: INFO log on CB transition to HALF_OPEN / CLOSED | Specified | Planned |
-| DLG-17 | P2: WARN log on bulkhead rejection event | Specified | Planned |
-| DLG-18 | P2: Rate-limit 429 trip log promoted to INFO | Specified | Planned |
-| DLG-19 | P2: `APP_LOG_LEVEL` env var toggles br.com.itau.invoicegenerator level | Specified | Planned |
-| DLG-20 | P2: Default level INFO when env var unset | Specified | Planned |
-| DLG-21 | P2: `/actuator/loggers` runtime override documented | Specified | Planned |
-| DLG-22 | P3: docs/observability.md "Debug logs catalog" subsection | Specified | Planned |
-| DLG-23 | P3: CLAUDE.md one-line pointer to APP_LOG_LEVEL | Specified | Planned |
+| DLG-01 | P1: INFO log on controller entry with orderId + itemCount | Verified | Verified |
+| DLG-02 | P1: INFO log on controller exit with invoiceId + status + elapsed-ms | Verified | Verified |
+| DLG-03 | P1: WARN/ERROR log in ApiExceptionHandler with codigo + status | Verified | Verified |
+| DLG-04 | P1: MDC carries correlationId/traceId/spanId on all log lines | Verified | Verified |
+| DLG-05 | P1: DEBUG log on tax bracket selection (personType, regime, rate) | Verified | Verified |
+| DLG-06 | P1: INFO log on TaxRateTable rejection with codigo | Verified | Verified |
+| DLG-07 | P1: DEBUG log on freight calculation with region + multiplier | Verified | Verified |
+| DLG-08 | P1: INFO log on LegacyFreightCalculator rejection with codigo | Verified | Verified |
+| DLG-09 | P1: Domain logs respect cardinality budget; no orderId in message body | Verified | Verified |
+| DLG-10 | P1: DEBUG enter log on each outbound adapter (4 adapters) | Verified | Verified |
+| DLG-11 | P1: DEBUG exit-ok log with elapsed-ms on each outbound adapter | Verified | Verified |
+| DLG-12 | P1: WARN log on adapter failure with exception class + message | Verified | Verified |
+| DLG-13 | P1: Existing IntegrationEventPublisher DEBUG ok line preserved | Verified | Verified |
+| DLG-14 | P1: WARN log on IntegrationEventPublisher failure | Verified | Verified |
+| DLG-15 | P2: WARN log on CB transition to OPEN | Verified | Verified |
+| DLG-16 | P2: INFO log on CB transition to HALF_OPEN / CLOSED | Verified | Verified |
+| DLG-17 | P2: WARN log on bulkhead rejection event | Verified | Verified |
+| DLG-18 | P2: Rate-limit 429 trip log promoted to INFO | Verified | Verified |
+| DLG-19 | P2: `APP_LOG_LEVEL` env var toggles br.com.itau.invoicegenerator level | Verified | Verified |
+| DLG-20 | P2: Default level INFO when env var unset | Verified | Verified |
+| DLG-21 | P2: `/actuator/loggers` runtime override documented | Verified | Verified |
+| DLG-22 | P3: docs/observability.md "Debug logs catalog" subsection | Verified | Verified |
+| DLG-23 | P3: CLAUDE.md one-line pointer to APP_LOG_LEVEL | Verified | Verified |
 
 **Status values:** Planned → In Tasks → Implementing → Verified
 
-**Coverage:** 23 total. Mapped to 5 tasks in `tasks.md`.
+**Coverage:** 23 / 23 Verified. T1..T5 all shipped 2026-05-25.
 
 ---
 
@@ -285,17 +285,17 @@ the application functional.
 
 ## Success Criteria
 
-- [ ] `./mvnw verify` passes (Spotless + Checkstyle + JaCoCo gate ≥ 85 % line / 75 %
+- [x] `./mvnw verify` passes (Spotless + Checkstyle + JaCoCo gate ≥ 85 % line / 75 %
       branch).
-- [ ] A single `POST /api/orders/generate-invoice` against the running container produces
+- [x] A single `POST /api/orders/generate-invoice` against the running container produces
       at least 8 JSON log lines (controller enter/exit, interactor enter/exit, tax bracket
       DEBUG, freight DEBUG, 4× adapter enter, 4× adapter exit, 4× Kafka publish ok). With
       `APP_LOG_LEVEL=INFO`, the volume drops to roughly 2 (controller enter/exit) — the
       DEBUG lines are gated.
-- [ ] A failed `POST /api/orders/generate-invoice` (`UNSUPPORTED_TAX_REGIME` /
+- [x] A failed `POST /api/orders/generate-invoice` (`UNSUPPORTED_TAX_REGIME` /
       `INVALID_DELIVERY_REGION` / `INVALID_TAX_REGIME`) produces one INFO log on the
       domain rejection plus one WARN log on the HTTP 400 response.
-- [ ] A tripped circuit breaker emits a WARN log with the CB name and state transition.
-- [ ] No metric tag added by this feature (cardinality budget unchanged).
-- [ ] `docs/observability.md` has a "Debug logs catalog" subsection.
-- [ ] `CLAUDE.md` mentions `APP_LOG_LEVEL` once.
+- [x] A tripped circuit breaker emits a WARN log with the CB name and state transition.
+- [x] No metric tag added by this feature (cardinality budget unchanged).
+- [x] `docs/observability.md` has a "Debug logs catalog" subsection.
+- [x] `CLAUDE.md` mentions `APP_LOG_LEVEL` once.
