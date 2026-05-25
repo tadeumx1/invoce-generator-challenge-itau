@@ -77,7 +77,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     if (limiter.acquirePermission()) {
       chain.doFilter(request, response);
     } else {
-      LOG.debug("rate-limit tripped: group={} ip={}", group, ip);
+      LOG.info(
+          "rate-limit tripped group={} ip={} method={} path={}",
+          group,
+          ip,
+          request.getMethod(),
+          request.getRequestURI());
       errorWriter.write429(response, group);
     }
   }
