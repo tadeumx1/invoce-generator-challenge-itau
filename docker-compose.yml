@@ -71,7 +71,7 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/orders/generate-invoice >/dev/null 2>&1 || curl -sf http://localhost:8080/ || exit 0"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health >/dev/null 2>&1 || curl -sf http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6

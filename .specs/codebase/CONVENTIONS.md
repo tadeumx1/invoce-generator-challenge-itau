@@ -8,10 +8,13 @@ These are the current conventions after F-UPGRADE and F-CLEAN.
 
 **Packages:** lowercase under `br.com.itau.invoicegenerator`, organized by Clean Architecture layer:
 
-- `domain.model`, `domain.port`, `domain.service`
+- `domain.model`, `domain.port`, `domain.service`, `domain.exception`
 - `application`
 - `adapter.web`, `adapter.web.dto`
-- `adapter.integration.*`
+- `adapter.integration.{stock,registration,delivery,finance}`
+- `adapter.messaging`
+- `adapter.observability`
+- `adapter.security`, `adapter.security.login`, `adapter.security.error`, `adapter.security.ratelimit`
 - `adapter.config`
 
 **Classes:** PascalCase. Use case interfaces use action names such as `GenerateInvoiceUseCase`; concrete interactors use `Interactor`. Legacy-preserving services are prefixed with `Legacy` until M2 defect fixes replace them.
@@ -35,7 +38,7 @@ Java sources are formatted with Spotless + google-java-format. Checkstyle blocks
 
 Money is represented as `BigDecimal` in domain models and web DTOs. Calculated money must go through `Money.rounded`, which applies scale 2 with `RoundingMode.HALF_EVEN`. Tax rates should be created from strings through `TaxRate.of(...)`.
 
-Domain validation failures use `InvalidInvoiceOrderException` with stable error codes; the web adapter maps those to HTTP 400. Nullability is not yet annotated. Integration sleeps still wrap `InterruptedException` as runtime exceptions; resilience/error modeling is deferred to M3.
+Domain validation failures use `InvalidInvoiceOrderException` with stable error codes; the web adapter maps those to HTTP 400. Nullability is not yet annotated. Integration adapters wrap `InterruptedException` as `IntegrationAdapterException` (typed `RuntimeException`) and preserve the interrupt flag via `Thread.currentThread().interrupt()` before throwing — C-8 closed by F-RESILIENCE. New adapter sleep sites must follow the same pattern. Every adapter method carries `@CircuitBreaker(name="<port>")` + `@Bulkhead(name="<port>")`; instance names match `application.properties` keys.
 
 ## Tests
 

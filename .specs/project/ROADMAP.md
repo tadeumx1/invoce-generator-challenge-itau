@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** M6 — Concurrency back-pressure + DX polish (complete)
-**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH). M5 closed (2026-05-24, F-RATELIMIT). M6 closed (2026-05-24, F-BULKHEAD + F-API-DOCS).
+**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH). M5 closed (2026-05-24, F-RATELIMIT; patch 2026-05-25, F-COMPOSE-HEALTHCHECK). M6 closed (2026-05-24, F-BULKHEAD + F-API-DOCS).
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 
@@ -118,12 +118,14 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 - Backend split mirroring AD-015: local Docker Compose uses Prometheus scrape + OTLP → Jaeger; AWS production uses Micrometer CloudWatch registry + ADOT collector → X-Ray. Same instrumentation code; profile-scoped registry/exporter dependency.
 - Deliverables include `docs/observability.md` with the SLI catalog, Prometheus queries per SLI, and runbook entries; F-AWS reuses the same SLI definitions for CloudWatch dashboards/alarms.
 
-**F-POSTMAN — Postman collection for the HTTP API** — COMPLETE (2026-05-23, quick task `.specs/quick/001-postman-collection`; `docs/postman/invoice-generator.postman_collection.json` + `docs/postman/README.md`; 6 requests, every one with `pm.test()` assertions; runs in Postman or via `npx newman`)
+**F-POSTMAN — Postman collection for the HTTP API** — COMPLETE (2026-05-23, quick task `.specs/quick/001-postman-collection`; auth patch tracked in `.specs/quick/003-postman-auth-collection`; tax-regime coverage tracked in `.specs/quick/004-postman-tax-regime-coverage`; `docs/postman/invoice-generator.postman_collection.json`; 11 requests, every one with `pm.test()` assertions; runs in Postman or via `npx newman`)
 
-- Two happy-path requests mirroring the shipped sample payloads (`teste-pf.json`, `teste-pj-simples.json`) and one legacy-alias request hitting `POST /api/pedido/gerarNotaFiscal`.
+- Four canonical happy-path requests cover every valid `TaxRateTable` person/tax-regime variation: `FISICA`, `JURIDICA + SIMPLES_NACIONAL`, `JURIDICA + LUCRO_REAL`, and `JURIDICA + LUCRO_PRESUMIDO`.
+- One legacy-alias happy path hits `POST /api/pedido/gerarNotaFiscal`.
 - Three rejection-path requests proving HTTP 400 + `codigo` contract for `UNSUPPORTED_TAX_REGIME`, `INVALID_TAX_REGIME`, `INVALID_DELIVERY_REGION` (the three codes enumerated in `RejectionCode`).
 - Every request injects `X-Correlation-Id` so the F-OBSERVABILITY MDC / trace correlation is exercised on every Postman call.
 - Single collection variable `baseUrl` (default `http://localhost:8080`) — no separate environment file needed.
+- Auth-aware DX patch: collection variable `accessToken`, login request storage, collection-level auto-login when the token is empty, and `Authorization: Bearer {{accessToken}}` on protected invoice/rejection requests.
 
 **F-AWS — AWS deployment proposal + Terraform IaC** — COMPLETE (2026-05-23, `terraform fmt -recursive -check + init -backend=false + validate` green across 5 modules; 36 spec requirements ticked; reviewer-facing write-up at `docs/aws-architecture.md`)
 
@@ -168,7 +170,7 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 ## M5 — Hardening & DX polish
 
 **Goal:** close the missing pieces of the "circuit-breaker + bulkhead + rate-limit-at-the-edge" picture — throttle abusive HTTP traffic, add a semaphore bulkhead to every outbound integration adapter, and ship a reviewer-friendly Swagger UI for the public HTTP surface.
-**Target:** completion of F-RATELIMIT, F-BULKHEAD, F-API-DOCS.
+**Target:** completion of F-RATELIMIT, F-BULKHEAD, F-API-DOCS, and the post-close F-COMPOSE-HEALTHCHECK DX patch.
 
 ### Features
 
@@ -200,6 +202,13 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 - `SecurityConfig` permits `/v3/api-docs/**`, `/v3/api-docs.yaml`, `/swagger-ui`, `/swagger-ui/**`, `/swagger-ui.html` without auth. F-RATELIMIT already does not throttle these paths (they live outside `/api/**`); the exemption is implicit via the `RateLimitPolicy` fall-through.
 - DTO-level `@Schema(description=...)` annotations intentionally absent — the JSON contract is frozen in `docs/business-rules.md`, which is the SSOT for field meaning.
 - AD-034 in `STATE.md` records the four design decisions (springdoc over Springfox, demo-light annotation level, `permitAll` + rate-limit-exempt, no DTO `@Schema(description)`).
+
+**F-COMPOSE-HEALTHCHECK — Docker Compose probes public Actuator health instead of protected invoice API** — COMPLETE (2026-05-25, quick task `.specs/quick/002-compose-healthcheck`; `docker compose config` green)
+
+- Replaced the `invoice-generator` container healthcheck from unauthenticated `GET /api/orders/generate-invoice` to `GET /actuator/health`.
+- Preserves the F-AUTH contract: invoice generation remains protected by JWT + `SCOPE_invoice:write`; health probes use the public endpoint already permitted by `SecurityConfig`.
+- Removes misleading Jaeger `AccessDeniedException` traces caused by the old healthcheck probing a protected mutating endpoint with the wrong HTTP method.
+- Healthcheck now fails closed with `exit 1` if the Actuator health endpoint is unavailable.
 
 ---
 

@@ -38,8 +38,8 @@ public class OpenAPIConfig {
                         + " / item value, computes freight by delivery region, and dispatches"
                         + " four side-effect events (stock, registration, delivery, accounts"
                         + " receivable) through Kafka. Protected endpoints require an HS256 JWT"
-                        + " obtained from POST /api/auth/login (demo users: demo/demo123,"
-                        + " admin/admin123). See docs/business-rules.md for the frozen contract.")
+                        + " obtained from POST /api/auth/login - demo users: demo/demo123,"
+                        + " admin/admin123")
                 .contact(new Contact().name("Invoice Generator Team")))
         .addServersItem(new Server().url("http://localhost:8080").description("Local development"))
         .components(

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1c5e2f4-7d3b-4f9e-9a21-1c0e8b8b1f01",
     "name": "invoice-generator",
-    "description": "HTTP collection for the Spring Boot invoice-generator service. Covers the happy paths for both shipped sample payloads (FISICA + JURIDICA SIMPLES_NACIONAL), the legacy alias `POST /api/pedido/gerarNotaFiscal`, and the three documented HTTP 400 rejections (UNSUPPORTED_TAX_REGIME, INVALID_TAX_REGIME, INVALID_DELIVERY_REGION). Every request injects `X-Correlation-Id` so F-OBSERVABILITY MDC / trace correlation is exercised. See `docs/observability.md` for SLI scrape URLs and `docs/postman/README.md` for import + env variable notes.",
+    "description": "HTTP collection for the Spring Boot invoice-generator service. Covers happy paths for every valid person/tax-regime variation (FISICA, JURIDICA SIMPLES_NACIONAL, JURIDICA LUCRO_REAL, JURIDICA LUCRO_PRESUMIDO), the legacy alias `POST /api/pedido/gerarNotaFiscal`, and the three documented HTTP 400 rejections (UNSUPPORTED_TAX_REGIME, INVALID_TAX_REGIME, INVALID_DELIVERY_REGION). Every request injects `X-Correlation-Id` so F-OBSERVABILITY MDC / trace correlation is exercised. See `docs/observability.md` for SLI scrape URLs and `docs/postman/README.md` for import + env variable notes.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -355,6 +355,130 @@
               ]
             },
             "description": "Mirror of `src/main/resources/payloads/teste-pj-simples.json`. Exercises the JURIDICA + SIMPLES_NACIONAL high-bracket (> 5000) rate 0.19."
+          }
+        },
+        {
+          "name": "POST /api/orders/generate-invoice \u2014 JURIDICA LUCRO_REAL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('returns JURIDICA + LUCRO_REAL recipient', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.destinatario.tipo_pessoa).to.eql('JURIDICA');",
+                  "  pm.expect(body.destinatario.regime_tributacao).to.eql('LUCRO_REAL');",
+                  "});",
+                  "pm.test('LUCRO_REAL totalItemsValue=1500 <= 2000 -> rate 0.09 -> 750 x 0.09 = 67.50', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.itens[0].valor_tributo_item).to.be.closeTo(67.5, 0.001);",
+                  "});",
+                  "pm.test('SUDESTE freight = 20 x 1.048 = 20.96 (HALF_EVEN, scale 2)', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.valor_frete).to.be.closeTo(20.96, 0.001);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-pj-lucro-real-happy"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 2,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 1500.0,\n  \"valor_frete\": 20.0,\n  \"itens\": [\n    {\n      \"id_item\": 2,\n      \"descricao\": \"Cadeira Ergonomica\",\n      \"valor_unitario\": 750,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"Empresa Lucro Real LTDA\",\n    \"tipo_pessoa\": \"JURIDICA\",\n    \"regime_tributacao\": \"LUCRO_REAL\",\n    \"documentos\": [\n      { \"tipo\": \"CNPJ\", \"numero\": \"49695613000180\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 andar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"S\u00e3o Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/generate-invoice",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "generate-invoice"
+              ]
+            },
+            "description": "Exercises the valid JURIDICA + LUCRO_REAL regime. With totalItemsValue 1500, `TaxRateTable` selects the <= 2000 bracket at rate 0.09."
+          }
+        },
+        {
+          "name": "POST /api/orders/generate-invoice \u2014 JURIDICA LUCRO_PRESUMIDO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('returns JURIDICA + LUCRO_PRESUMIDO recipient', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.destinatario.tipo_pessoa).to.eql('JURIDICA');",
+                  "  pm.expect(body.destinatario.regime_tributacao).to.eql('LUCRO_PRESUMIDO');",
+                  "});",
+                  "pm.test('LUCRO_PRESUMIDO totalItemsValue=3000 <= 5000 -> rate 0.16 -> 1500 x 0.16 = 240.00', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.itens[0].valor_tributo_item).to.be.closeTo(240.0, 0.001);",
+                  "});",
+                  "pm.test('SUDESTE freight = 30 x 1.048 = 31.44 (HALF_EVEN, scale 2)', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.valor_frete).to.be.closeTo(31.44, 0.001);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-pj-lucro-presumido-happy"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 3,\n  \"data\": \"2022-05-01\",\n  \"valor_total_itens\": 3000.0,\n  \"valor_frete\": 30.0,\n  \"itens\": [\n    {\n      \"id_item\": 3,\n      \"descricao\": \"Notebook Corporativo\",\n      \"valor_unitario\": 1500,\n      \"quantidade\": 2\n    }\n  ],\n  \"destinatario\": {\n    \"nome\": \"Empresa Lucro Presumido LTDA\",\n    \"tipo_pessoa\": \"JURIDICA\",\n    \"regime_tributacao\": \"LUCRO_PRESUMIDO\",\n    \"documentos\": [\n      { \"tipo\": \"CNPJ\", \"numero\": \"49695613000180\" }\n    ],\n    \"enderecos\": [\n      {\n        \"logradouro\": \"Av do estado\",\n        \"numero\": \"5533\",\n        \"complemento\": \"4 andar b\",\n        \"bairro\": \"Mooca\",\n        \"cidade\": \"S\u00e3o Paulo\",\n        \"estado\": \"SP\",\n        \"pais\": \"Brasil\",\n        \"cep\": \"03105003\",\n        \"finalidade\": \"ENTREGA\",\n        \"regiao\": \"SUDESTE\"\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/generate-invoice",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "generate-invoice"
+              ]
+            },
+            "description": "Exercises the valid JURIDICA + LUCRO_PRESUMIDO regime. With totalItemsValue 3000, `TaxRateTable` selects the <= 5000 bracket at rate 0.16."
           }
         },
         {

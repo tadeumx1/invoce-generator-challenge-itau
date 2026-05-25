@@ -63,6 +63,22 @@ docker compose down                          # stop and remove all containers + 
 docker compose down -v                       # additionally wipe named volumes, if any are added later
 ```
 
+To inspect each container in a dedicated terminal:
+
+```bash
+docker compose logs -f invoice-generator     # Spring Boot application
+docker compose logs -f kafka                 # Kafka broker
+docker compose logs -f jaeger                # Jaeger collector + UI
+```
+
+For a bounded snapshot instead of a live tail:
+
+```bash
+docker compose logs --tail=200 invoice-generator
+docker compose logs --tail=200 kafka
+docker compose logs --tail=200 jaeger
+```
+
 When you bring up only Kafka and run the app locally with `./mvnw spring-boot:run`, point the producer at the external listener:
 
 ```bash
