@@ -85,7 +85,8 @@ Framework and outside-world code.
 - `adapter/security` — `SecurityConfig`, JWT issuing/validation under `login/`, 401/403 envelopes
   under `error/`, per-IP rate limiting under `ratelimit/`.
 - `adapter/observability` — correlation IDs, Micrometer metrics, Observation API wrapping, Kafka
-  MDC/header plumbing, side-effect timing listener.
+  MDC/header plumbing, side-effect timing listener, and `ResilienceEventLogger` that emits
+  WARN/INFO log lines on circuit-breaker state transitions and bulkhead rejections (F-DEBUG-LOGS).
 - `adapter/messaging` — `KafkaInvoiceSideEffectDispatcher`, `IntegrationEventPublisher`,
   `IdempotencyStore`, `InvoiceTopics`, `KafkaMessagingConfig`, `KafkaTopicsConfig`.
 - `adapter/integration` — outbound port implementations for stock / registration / delivery /

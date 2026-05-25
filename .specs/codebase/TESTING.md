@@ -167,9 +167,11 @@ Falling below either threshold fails the build.
 | `adapter.security.ratelimit.RateLimitMetricsIntegrationTest` | 2 | F-RATELIMIT (Prometheus scrape: `name="auth-login"` meter present + no per-IP synthetic name leak) |
 | `adapter.integration.BulkheadEnforcementTest` | 2 | F-BULKHEAD (semaphore exhaustion) |
 | `adapter.web.OpenApiDocsIntegrationTest` | 4 | F-API-DOCS (`/v3/api-docs` reachable anonymously, declares `bearer-jwt`, surfaces three productive paths, Swagger UI reachable) |
+| `observability.DebugLogsIntegrationTest` | 2 | F-DEBUG-LOGS (controller + interactor + tax bracket + freight DEBUG/INFO bracketing via ListAppender; INFO+WARN on UNSUPPORTED_TAX_REGIME path) |
+| `observability.ResilienceEventLoggerTest` | 2 | F-DEBUG-LOGS (CB OPEN WARN + bulkhead rejection WARN via Resilience4j event publishers) |
 | `InvoiceGeneratorApplicationTests` | 1 | Context smoke |
 
-Class counts above approximate `@Test` + `@ParameterizedTest` matrices; the authoritative total (137) is reported by Surefire.
+Class counts above approximate `@Test` + `@ParameterizedTest` matrices; the authoritative total (141) is reported by Surefire.
 
 ### Slow profile — `./mvnw test -Pslow`
 
@@ -179,7 +181,7 @@ Class counts above approximate `@Test` + `@ParameterizedTest` matrices; the auth
 
 ### `./mvnw verify`
 
-Adds Spotless format check, Checkstyle, jar packaging, JaCoCo HTML report, and the JaCoCo coverage threshold check (`jacoco:check`, bundle ≥ 85 % line / ≥ 75 % branch) on top of `./mvnw test`. Same 137 tests; total ~50 s.
+Adds Spotless format check, Checkstyle, jar packaging, JaCoCo HTML report, and the JaCoCo coverage threshold check (`jacoco:check`, bundle ≥ 85 % line / ≥ 75 % branch) on top of `./mvnw test`. Same 141 tests; total ~50 s.
 
 ---
 

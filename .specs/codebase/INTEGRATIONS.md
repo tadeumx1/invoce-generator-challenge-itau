@@ -171,7 +171,7 @@ AD-034 for the field-semantics SSOT trade-off (DTO docstrings are minimal; prose
 | AuthN / AuthZ | Cognito or JWT verifier at gateway | F-AWS |
 | Async messaging | Amazon MSK (Kafka) or SQS with DLQ | F-AWS, AD-018 |
 | Resilience | Resilience4j on adapters (same as today) | F-RESILIENCE, F-BULKHEAD |
-| Logs | CloudWatch Logs (JSON via logstash encoder) | F-OBSERVABILITY |
+| Logs | CloudWatch Logs (JSON via logstash encoder); `APP_LOG_LEVEL` env var on the ECS task definition flips application-package DEBUG at restart, `POST /actuator/loggers/...` flips it without one | F-OBSERVABILITY, F-DEBUG-LOGS |
 | Metrics | Micrometer + CloudWatch Metrics registry | F-OBSERVABILITY |
 | Tracing | OpenTelemetry → ADOT → AWS X-Ray | F-OBSERVABILITY |
 | IaC | Terraform (proposal-grade under `infra/terraform/`) | F-AWS |

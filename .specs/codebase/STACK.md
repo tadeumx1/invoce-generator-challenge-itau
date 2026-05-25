@@ -44,7 +44,10 @@
 - `io.micrometer:micrometer-registry-prometheus` — Prometheus scrape endpoint
 - `io.micrometer:micrometer-tracing-bridge-otel` + `io.opentelemetry:opentelemetry-exporter-otlp`
   — OTLP trace export (to local Jaeger / AWS ADOT)
-- `net.logstash.logback:logstash-logback-encoder` (8.0) — JSON structured logs
+- `net.logstash.logback:logstash-logback-encoder` (8.0) — JSON structured logs. Application
+  package logger `br.com.itau.invoicegenerator` defaults to INFO; env var `APP_LOG_LEVEL`
+  (default `INFO`) flips it to DEBUG at container restart, and `POST /actuator/loggers/...`
+  flips it without a restart (F-DEBUG-LOGS).
 - `org.springdoc:springdoc-openapi-starter-webmvc-ui` (2.8.13) — OpenAPI 3 spec + Swagger UI
 - `org.projectlombok:lombok` — model boilerplate
 

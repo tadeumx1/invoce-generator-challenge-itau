@@ -100,3 +100,13 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 **Evidence:** Spring Boot 2.6.2 → Lombok 1.18.22 → fails on JDK 16+ with `NoSuchFieldError: Class com.sun.tools.javac.tree.JCTree$JCImport does not have member field 'com.sun.tools.javac.tree.JCTree qualid'`.
 **Impact:** Before F-UPGRADE, builds only succeeded under JDK 11.
 **Fix:** F-UPGRADE moved the project to Java 21 + Spring Boot 3.5.14. `./mvnw verify` passes on the default JDK 21 shell.
+
+
+---
+
+## C-11 — DEBUG log volume amplification on CloudWatch (operator awareness, not a code defect)
+
+**Evidence:** F-DEBUG-LOGS (M7, 2026-05-25) adds DEBUG lines on tax-bracket selection, freight calculation, and 4× outbound adapter enter/exit. With `APP_LOG_LEVEL=DEBUG` flipped on the application package, a single `POST /api/orders/generate-invoice` produces roughly **6× the log volume** of the default INFO level (~2 lines → ~8 lines).
+**Pattern:** DEBUG is opt-in only — bounded to the `br.com.itau.invoicegenerator` package via `logback-spring.xml`. Default level remains INFO so production CloudWatch storage is not amplified by accident.
+**Mitigation:** Documented in `docs/observability.md` §"Debug logs catalog" → "Runtime log-level toggling": on-call flips DEBUG via env var (`APP_LOG_LEVEL=DEBUG`) at container restart **or** via `POST /actuator/loggers/br.com.itau.invoicegenerator` without a restart, captures the request, and flips back to INFO. Both routes are reversible at runtime.
+**Residual risk:** an on-call leaving DEBUG flipped on after an incident. The actuator `POST {"configuredLevel": null}` reverts to the inherited level; an env-var change requires a redeploy. Future work could add a CloudWatch alarm on application log line volume per minute to surface accidentally-left-on DEBUG.

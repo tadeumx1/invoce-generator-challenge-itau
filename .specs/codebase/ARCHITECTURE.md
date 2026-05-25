@@ -102,9 +102,12 @@ Current adapter responsibilities:
 - `adapter/observability`: `CorrelationIdFilter`, `UseCaseObservation`, `InvoiceMetricsRecorder`,
   Kafka MDC/header plumbing (`InvoiceKafkaHeaders`, `KafkaHeaderEnricher`,
   `MdcRestoringRecordInterceptor`, `SideEffectTimingConsumerListener`),
-  `RejectionCode`, and `ObservabilityConfig`. Backs the four SLIs frozen in
-  `.specs/features/observability/spec.md` (HTTP success rate, HTTP latency, Kafka dispatch
-  success, side-effect end-to-end latency).
+  `RejectionCode`, `ObservabilityConfig`, and `ResilienceEventLogger` (F-DEBUG-LOGS —
+  subscribes to `CircuitBreakerRegistry` + `BulkheadRegistry` event publishers and emits
+  WARN/INFO log lines on state transitions and bulkhead rejections). Backs the four SLIs
+  frozen in `.specs/features/observability/spec.md` (HTTP success rate, HTTP latency,
+  Kafka dispatch success, side-effect end-to-end latency) and the debug-log catalog
+  frozen in `.specs/features/debug-logs/spec.md`.
 - `adapter/messaging`: `IntegrationEvent` envelope, `InvoiceTopics` constants,
   `IntegrationEventPublisher` (+ `IntegrationEventPublishException`),
   `KafkaInvoiceSideEffectDispatcher`, `IdempotencyStore`, `KafkaTopicsConfig`,
@@ -214,7 +217,8 @@ src/main/java/br/com/itau/invoicegenerator/
 |   |                           IdempotencyStore, InvoiceTopics, KafkaMessagingConfig, KafkaTopicsConfig
 |   |-- observability/          UseCaseObservation, CorrelationIdFilter, InvoiceMetricsRecorder,
 |   |                           InvoiceKafkaHeaders, KafkaHeaderEnricher, MdcRestoringRecordInterceptor,
-|   |                           SideEffectTimingConsumerListener, RejectionCode, ObservabilityConfig
+|   |                           SideEffectTimingConsumerListener, RejectionCode, ObservabilityConfig,
+|   |                           ResilienceEventLogger (F-DEBUG-LOGS)
 |   |-- security/               SecurityConfig, ApiSecurityProperties
 |   |   |-- error/              ApiBearerAuthenticationEntryPoint, ApiBearerAccessDeniedHandler
 |   |   |-- login/              AuthController, JwtIssuer, InMemoryUserStore, DemoUser,
