@@ -55,7 +55,7 @@ fakes — no mocks). Spring Boot and the whole Spring Kafka family are managed b
 ```bash
 ./mvnw test                # fast suite (64 tests) — excludes @Tag("slow")
 ./mvnw test -Pslow         # runs only the slow C-6 characterization
-./mvnw verify              # primary gate: tests + Spotless + Checkstyle + JaCoCo
+./mvnw verify              # primary gate: tests + Spotless + Checkstyle + JaCoCo thresholds
 scripts/coverage-html.sh   # prettier ReportGenerator coverage HTML
 ./mvnw spring-boot:run     # boot the app on port 8080
 ./mvnw spotless:apply      # reformat sources (google-java-format)
@@ -63,10 +63,10 @@ scripts/coverage-html.sh   # prettier ReportGenerator coverage HTML
 ```
 
 **`./mvnw verify`** is the official gate — it compiles against Java 21, runs every
-test, enforces Spotless + Checkstyle, and emits the JaCoCo report at
-`target/site/jacoco/index.html`. `scripts/coverage-html.sh` uses the pinned
-ReportGenerator local tool to render the same JaCoCo XML as
-`target/site/coverage/index.html`.
+test, enforces Spotless + Checkstyle, and fails below 85% line coverage or 75%
+branch coverage. The JaCoCo report lands at `target/site/jacoco/index.html`.
+`scripts/coverage-html.sh` uses the pinned ReportGenerator local tool to render
+the same JaCoCo XML as `target/site/coverage/index.html`.
 
 ### Hitting the API locally
 

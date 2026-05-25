@@ -42,7 +42,9 @@ Mockito is intentionally excluded from the test starter (see `pom.xml`) — ever
 
 ### Coverage
 
-JaCoCo runs as part of `./mvnw verify`. The standard HTML report lands at `target/site/jacoco/index.html`; the XML used by CI at `target/site/jacoco/jacoco.xml`. Open the HTML and drill into `application/` and `domain/` first — the adapters are mostly integration-tested.
+JaCoCo runs as part of `./mvnw verify`. The standard HTML report lands at `target/site/jacoco/index.html`; the XML used by CI at `target/site/jacoco/jacoco.xml`. The build fails below 85% line coverage or 75% branch coverage.
+
+The coverage gate excludes bootstrap, Spring configuration, interfaces/ports, DTOs, request/response records, exceptions, domain data carriers/enums, and static topic/header constants. Open the HTML and drill into `application/`, `domain/service/`, controllers, filters, mappers, handlers, and adapter behavior first — those are the files the gate is meant to protect.
 
 For a nicer local HTML report, use ReportGenerator. It consumes JaCoCo's XML and writes `target/site/coverage/index.html`.
 
