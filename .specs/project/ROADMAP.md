@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** M7 — AWS observability backend wiring (planned, not started)
-**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH). M5 closed (2026-05-24, F-RATELIMIT; patch 2026-05-25, F-COMPOSE-HEALTHCHECK). M6 closed (2026-05-24, F-BULKHEAD + F-API-DOCS). M7 specced 2026-05-25 (F-CLOUDWATCH-METRICS — `.specs/features/cloudwatch-metrics/`).
+**Status:** M1/M2/M3 closed (2026-05-23). M4 closed (2026-05-24, F-AUTH). M5 closed (2026-05-24, F-RATELIMIT; patch 2026-05-25, F-COMPOSE-HEALTHCHECK). M6 closed (2026-05-24, F-BULKHEAD + F-API-DOCS). M7 specced 2026-05-25 (F-CLOUDWATCH-METRICS — `.specs/features/cloudwatch-metrics/`). **Next:** F-CLOUDWATCH-METRICS T1 — add `io.micrometer:micrometer-registry-cloudwatch2` dependency to `pom.xml` (verifies REQ-1; gate `./mvnw verify`).
 
 This roadmap reflects the user-confirmed sequencing: **safety net → upgrade → Clean Architecture → defect fixes → operations**. Each feature has an ID used everywhere else (`CONCERNS.md`, spec files, commit messages).
 
