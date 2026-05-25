@@ -7,8 +7,12 @@ import br.com.itau.invoicegenerator.domain.model.Recipient;
 import br.com.itau.invoicegenerator.domain.model.TaxRate;
 import java.math.BigDecimal;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TaxRateTable {
+
+  private static final Logger log = LoggerFactory.getLogger(TaxRateTable.class);
 
   private static final TaxRateBracket[] FISICA_BRACKETS = {
     TaxRateBracket.lessThan(500, "0"),
@@ -42,10 +46,18 @@ public class TaxRateTable {
       throw invalid("INVALID_PERSON_TYPE", "Recipient person type is required.");
     }
 
-    return switch (recipient.getPersonType()) {
-      case FISICA -> Optional.of(rateForFisica(totalItemsValue));
-      case JURIDICA -> rateForJuridica(recipient.getTaxRegime(), totalItemsValue);
-    };
+    Optional<BigDecimal> selected =
+        switch (recipient.getPersonType()) {
+          case FISICA -> Optional.of(rateForFisica(totalItemsValue));
+          case JURIDICA -> rateForJuridica(recipient.getTaxRegime(), totalItemsValue);
+        };
+    log.debug(
+        "tax bracket selected personType={} taxRegime={} totalItemsValue={} rate={}",
+        recipient.getPersonType(),
+        recipient.getTaxRegime(),
+        totalItemsValue,
+        selected.map(BigDecimal::toPlainString).orElse("none"));
+    return selected;
   }
 
   private BigDecimal rateForFisica(BigDecimal totalItemsValue) {
@@ -92,6 +104,7 @@ public class TaxRateTable {
   }
 
   private InvalidInvoiceOrderException invalid(String code, String message) {
+    log.info("invoice rejected at tax bracket selection codigo={} reason={}", code, message);
     return new InvalidInvoiceOrderException(code, message);
   }
 

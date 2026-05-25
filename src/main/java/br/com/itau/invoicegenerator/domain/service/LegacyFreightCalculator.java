@@ -9,29 +9,43 @@ import br.com.itau.invoicegenerator.domain.model.Region;
 import br.com.itau.invoicegenerator.domain.port.FreightCalculator;
 import java.math.BigDecimal;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LegacyFreightCalculator implements FreightCalculator {
+
+  private static final Logger log = LoggerFactory.getLogger(LegacyFreightCalculator.class);
 
   @Override
   public BigDecimal calculateFreight(Order order) {
     Region region =
         findDeliveryRegion(order)
             .orElseThrow(
-                () ->
-                    new InvalidInvoiceOrderException(
-                        "INVALID_DELIVERY_REGION",
-                        "A delivery address with region is required to calculate freight."));
+                () -> {
+                  log.info(
+                      "freight rejected codigo=INVALID_DELIVERY_REGION reason=missing-or-null-region");
+                  return new InvalidInvoiceOrderException(
+                      "INVALID_DELIVERY_REGION",
+                      "A delivery address with region is required to calculate freight.");
+                });
 
     BigDecimal freightValue = order.getFreightValue();
-    BigDecimal adjustedFreight =
+    BigDecimal multiplier =
         switch (region) {
-          case NORTE -> freightValue.multiply(new BigDecimal("1.08"));
-          case NORDESTE -> freightValue.multiply(new BigDecimal("1.085"));
-          case CENTRO_OESTE -> freightValue.multiply(new BigDecimal("1.07"));
-          case SUDESTE -> freightValue.multiply(new BigDecimal("1.048"));
-          case SUL -> freightValue.multiply(new BigDecimal("1.06"));
+          case NORTE -> new BigDecimal("1.08");
+          case NORDESTE -> new BigDecimal("1.085");
+          case CENTRO_OESTE -> new BigDecimal("1.07");
+          case SUDESTE -> new BigDecimal("1.048");
+          case SUL -> new BigDecimal("1.06");
         };
-    return Money.rounded(adjustedFreight);
+    BigDecimal adjusted = Money.rounded(freightValue.multiply(multiplier));
+    log.debug(
+        "freight calculated region={} baseFreight={} multiplier={} adjustedFreight={}",
+        region,
+        freightValue.toPlainString(),
+        multiplier.toPlainString(),
+        adjusted.toPlainString());
+    return adjusted;
   }
 
   private Optional<Region> findDeliveryRegion(Order order) {
