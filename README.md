@@ -231,7 +231,7 @@ Full architecture write-up: [`.specs/codebase/ARCHITECTURE.md`](.specs/codebase/
 
 The AWS architecture diagrams are also available as images below. There is an
 editable draw.io file with the diagrams inside the `docs` folder:
-[`docs/aws-architecture-diagrams.drawio`](docs/aws-architecture-diagrams.drawio). Also insithe the docs folder you can take a look on the aws-architecture-diagram.md to understand the diagrams and the decisions on the solution.
+[`docs/aws-architecture-diagrams.drawio`](docs/aws-architecture-diagrams.drawio). Also inside the docs folder you can take a look on the aws-architecture-diagram.md to understand the diagrams and the decisions on the solution.
 
 #### Main diagram — context view
 
