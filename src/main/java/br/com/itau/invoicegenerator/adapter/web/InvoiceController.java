@@ -13,6 +13,8 @@ import br.com.itau.invoicegenerator.domain.model.Recipient;
 import br.com.itau.invoicegenerator.domain.model.Region;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class InvoiceController {
+
+  private static final Logger LOG = LoggerFactory.getLogger(InvoiceController.class);
 
   private final UseCaseObservation useCaseObservation;
   private final InvoiceMetricsRecorder metricsRecorder;
@@ -44,14 +48,25 @@ public class InvoiceController {
               + " /api/pedido/gerarNotaFiscal is the preserved legacy alias.")
   @SecurityRequirement(name = "bearer-jwt")
   public ResponseEntity<InvoiceDto> generateInvoice(@RequestBody OrderDto request) {
+    long startNanos = System.nanoTime();
     Order order = webInvoiceMapper.toDomain(request);
+    int itemCount = order.getItems() == null ? 0 : order.getItems().size();
+    LOG.info(
+        "invoice request received orderId={} itemCount={} personType={} taxRegime={}",
+        order.getOrderId(),
+        itemCount,
+        order.getRecipient().getPersonType(),
+        order.getRecipient().getTaxRegime());
     Invoice invoice = useCaseObservation.generate(order);
     Recipient recipient = order.getRecipient();
     metricsRecorder.recordGenerated(
-        recipient.getPersonType(),
-        recipient.getTaxRegime(),
-        deliveryRegion(order),
-        order.getItems() == null ? 0 : order.getItems().size());
+        recipient.getPersonType(), recipient.getTaxRegime(), deliveryRegion(order), itemCount);
+    long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+    LOG.info(
+        "invoice request completed orderId={} invoiceId={} status=200 elapsedMs={}",
+        order.getOrderId(),
+        invoice.getInvoiceId(),
+        elapsedMs);
     return new ResponseEntity<>(webInvoiceMapper.toDto(invoice), HttpStatus.OK);
   }
 

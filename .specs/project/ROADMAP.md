@@ -230,6 +230,26 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 
 ---
 
+## M8 — Operator-facing log coverage
+
+**Goal:** complement F-OBSERVABILITY's metric/trace plumbing with wide `info`/`debug`
+log coverage on the HTTP request path so a CloudWatch operator can reconstruct an
+incident from logs alone, not only from Prometheus / X-Ray. Layered on top of the
+existing MDC + JSON encoder — no new dependencies, no new metric tags, AD-020
+cardinality budget preserved.
+**Target:** completion of F-DEBUG-LOGS.
+
+### Features
+
+**F-DEBUG-LOGS — Structured debug/info logs across controller + interactor + domain + adapters + resilience events** — PLANNED (2026-05-25, spec + tasks drafted under `.specs/features/debug-logs/`; not implemented)
+
+- 23 requirements (DLG-01..DLG-23) across HTTP entry/exit bracketing, domain decision tracing (tax bracket selection, freight region/multiplier, validation rejections), outbound adapter enter/exit/fail logs, Kafka publisher failure WARN, Resilience4j circuit-breaker + bulkhead event listeners, and rate-limit trip promotion to INFO.
+- 5 vertical-slice tasks (T1 HTTP path · T2 domain decisions · T3 adapters + Kafka · T4 resilience events · T5 tests + `APP_LOG_LEVEL` env-var binding + `docs/observability.md` catalog).
+- Reuses F-OBSERVABILITY MDC (`correlationId`/`traceId`/`spanId`/`invoiceId`/`orderId`), `logstash-logback-encoder` JSON output (AD-019/AD-022), and the actuator `/actuator/loggers` runtime-flip surface. No new dependencies on the classpath.
+- `APP_LOG_LEVEL` env var (default `INFO`) lets on-call flip `br.com.itau.invoicegenerator` to `DEBUG` at container restart without a rebuild; `/actuator/loggers` POST flips it without a restart.
+
+---
+
 ## Future Considerations
 
 - Real SEFAZ / fiscal registry integration (today only stubbed).

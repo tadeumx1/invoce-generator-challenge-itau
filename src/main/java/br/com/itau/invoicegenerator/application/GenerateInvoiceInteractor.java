@@ -11,8 +11,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GenerateInvoiceInteractor implements GenerateInvoiceUseCase {
+
+  private static final Logger log = LoggerFactory.getLogger(GenerateInvoiceInteractor.class);
 
   private final TaxRateTable taxRateTable;
   private final TaxRateCalculator taxRateCalculator;
@@ -32,6 +36,7 @@ public class GenerateInvoiceInteractor implements GenerateInvoiceUseCase {
 
   @Override
   public Invoice generateInvoice(Order order) {
+    log.info("invoice generation begin orderId={}", order.getOrderId());
     List<InvoiceItem> invoiceItems = new ArrayList<>();
     var taxRate = taxRateTable.findRate(order);
 
@@ -54,6 +59,10 @@ public class GenerateInvoiceInteractor implements GenerateInvoiceUseCase {
     // stock, fiscal registration, delivery, and finance have completed.
     sideEffectDispatcher.dispatch(invoice);
 
+    log.info(
+        "invoice generation complete orderId={} invoiceId={}",
+        order.getOrderId(),
+        invoice.getInvoiceId());
     return invoice;
   }
 }
