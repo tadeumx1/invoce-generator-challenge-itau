@@ -217,6 +217,14 @@
 						<exclude>**/adapter/observability/InvoiceKafkaHeaders*</exclude>
 						<exclude>**/adapter/observability/RejectionCode*</exclude>
 						<exclude>**/adapter/security/login/DemoUser*</exclude>
+						<!-- Thin Thread.sleep-only outbound adapter impls. Real exercise lives in the
+						     slow profile + Kafka end-to-end; fast tests use RecordingPorts substitutes
+						     (see InvoiceKafkaFlowIntegrationTest). Curated exclude per AD-036. -->
+						<exclude>**/adapter/integration/stock/StockIntegrationAdapter*</exclude>
+						<exclude>**/adapter/integration/registration/InvoiceRegistrationAdapter*</exclude>
+						<exclude>**/adapter/integration/delivery/DeliveryIntegrationAdapter*</exclude>
+						<exclude>**/adapter/integration/delivery/DeliverySchedulingClient*</exclude>
+						<exclude>**/adapter/integration/finance/AccountsReceivableAdapter*</exclude>
 					</excludes>
 					<rules>
 						<rule>

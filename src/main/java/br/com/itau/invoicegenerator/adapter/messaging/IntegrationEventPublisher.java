@@ -57,10 +57,23 @@ public class IntegrationEventPublisher {
       Thread.currentThread().interrupt();
       metricsRecorder.recordDispatch(
           topic, false, Duration.ofNanos(System.nanoTime() - startNanos));
+      log.warn(
+          "kafka publish fail topic={} eventId={} invoiceId={} exceptionClass={} reason=interrupted",
+          topic,
+          event.eventId(),
+          event.invoiceId(),
+          e.getClass().getName());
       throw new IntegrationEventPublishException(topic, event, e);
     } catch (ExecutionException | TimeoutException e) {
       metricsRecorder.recordDispatch(
           topic, false, Duration.ofNanos(System.nanoTime() - startNanos));
+      log.warn(
+          "kafka publish fail topic={} eventId={} invoiceId={} exceptionClass={} reason={}",
+          topic,
+          event.eventId(),
+          event.invoiceId(),
+          e.getClass().getName(),
+          e.getMessage());
       throw new IntegrationEventPublishException(topic, event, e);
     }
   }
