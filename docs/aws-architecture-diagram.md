@@ -10,6 +10,15 @@ Three diagrams at increasing zoom levels: the **main** one gives you the
 to the local stack, and the **sequence** one explains the synchronous-HTTP /
 asynchronous-side-effects twist.
 
+> **Rendering notes.** The Main and Structural diagrams embed AWS official
+> architecture icons via `<img>` tags hosted on `icon.icepanel.io` (a public
+> CDN mirror of AWS's freely licensed icon set), so they render with the right
+> AWS iconography in any mermaid v10+ renderer that honors HTML labels —
+> including GitHub, mermaid.live, and draw.io (Arrange → Insert → Advanced →
+> Mermaid). No iconify icon pack registration is required. The Sequence
+> diagram is intentionally icon-free: sequence semantics describe interaction
+> order, not topology.
+
 ---
 
 ## Main Diagram — context view

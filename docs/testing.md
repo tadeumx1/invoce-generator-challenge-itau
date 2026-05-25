@@ -42,7 +42,16 @@ Mockito is intentionally excluded from the test starter (see `pom.xml`) — ever
 
 ### Coverage
 
-JaCoCo runs as part of `./mvnw verify`. The HTML report lands at `target/site/jacoco/index.html`; the XML used by CI at `target/site/jacoco/jacoco.xml`. Open the HTML and drill into `application/` and `domain/` first — the adapters are mostly integration-tested.
+JaCoCo runs as part of `./mvnw verify`. The standard HTML report lands at `target/site/jacoco/index.html`; the XML used by CI at `target/site/jacoco/jacoco.xml`. Open the HTML and drill into `application/` and `domain/` first — the adapters are mostly integration-tested.
+
+For a nicer local HTML report, use ReportGenerator. It consumes JaCoCo's XML and writes `target/site/coverage/index.html`.
+
+```bash
+scripts/coverage-html.sh
+open target/site/coverage/index.html
+```
+
+The script restores the pinned local .NET tool from `.config/dotnet-tools.json`. If `dotnet` is missing, install the .NET SDK first.
 
 ## End-to-end HTTP tests (Newman)
 
