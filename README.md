@@ -227,6 +227,24 @@ Layer rules:
 
 Full architecture write-up: [`.specs/codebase/ARCHITECTURE.md`](.specs/codebase/ARCHITECTURE.md).
 
+### AWS architecture diagrams
+
+The AWS architecture diagrams are also available as images below. There is an
+editable draw.io file with the diagrams inside the `docs` folder:
+[`docs/aws-architecture-diagrams.drawio`](docs/aws-architecture-diagrams.drawio).
+
+#### Main diagram — context view
+
+![AWS architecture main context diagram](docs/images/aws-architecture-main.png)
+
+#### Structural diagram — what runs on AWS
+
+![AWS architecture structural diagram](docs/images/aws-architecture-structural.png)
+
+#### Sequence diagram — synchronous HTTP + asynchronous side effects
+
+![AWS architecture sequence diagram](docs/images/aws-architecture-sequence.png)
+
 ---
 
 ## Business rules (summary)
