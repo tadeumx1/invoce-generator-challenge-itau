@@ -530,6 +530,64 @@ test count `103 -> 131` (M5/RATELIMIT) `-> 137` (M5/BULKHEAD+API-DOCS). Postman
 collection gains the `RATE_LIMIT_EXCEEDED on 6th attempt` request; Newman last
 run = `14 requests / 27 assertions / 0 failures / 2.1s`.
 
+### AD-036: JaCoCo coverage gate — bundle ≥ 85 % line / ≥ 75 % branch with curated excludes (2026-05-25)
+
+**Decision:** `./mvnw verify` now fails the build below **85 % line** or **75 % branch**
+coverage at the **bundle** level. One `<rule>` on `BUNDLE` with two `<limit>`s in
+`pom.xml`'s `jacoco-maven-plugin > configuration > rules`; a `<execution id="check">`
+binds `jacoco:check` to the `verify` phase. Low-signal classes are excluded from
+JaCoCo measurement entirely (see `<excludes>` in `pom.xml`):
+
+- Bootstrap: `**/InvoiceGeneratorApplication*`.
+- Spring wiring / properties: `**/*Config*`, `**/*Properties*`.
+- Adapter contracts: `**/*Dto*`, `**/*Request*`, `**/*Response*`, `**/*Exception*`.
+- Use-case interfaces (no executable code): `**/*UseCase*`.
+- Domain contracts and data carriers: `**/domain/port/**`, `**/domain/model/**`.
+- Static envelopes / constants: `**/adapter/messaging/IntegrationEvent*`,
+  `**/adapter/messaging/InvoiceTopics*`,
+  `**/adapter/observability/InvoiceKafkaHeaders*`,
+  `**/adapter/observability/RejectionCode*`.
+- Demo-user data carriers: `**/adapter/security/login/DemoUser*`.
+
+**Reason:** F-SAFETY-NET and F-UPGRADE deferred enforcement with a per-layer
+sketch (≥ 80 % domain/use-case, ≥ 60 % adapter). Per-layer JaCoCo rules are
+brittle — `<element>PACKAGE</element>` needs careful per-package wiring, and a
+wrong glob silently exempts a layer. A **single bundle rule** is simpler to
+reason about, review, and tune; the exclude list does the layer-shaping work
+explicitly. The 85 % / 75 % values match what the current safety net actually
+achieves with a few points of headroom so a single new test cannot flip the
+build red. The divergence from the originally-deferred per-layer plan is
+intentional. Sequencing: quick task `006` shipped the ReportGenerator HTML view
+first so contributors can read the report; quick task `007` then turned the
+gate on.
+
+**Trade-off:** Three honest limitations:
+
+- **Bundle-level signal is coarse.** A regression that drops adapter coverage
+  while domain coverage rises can hide inside the same bundle ratio. Mitigated
+  by the curated exclude list: every excluded class is either a contract,
+  bootstrap, constant, or pure data carrier; the remaining covered surface is
+  the behavioral code. Tightening later (per-package rules, MUTATION counter,
+  etc.) is a forward-compatible change.
+- **Glob-based excludes are name-based.** A new `FooConfig` or `BarResponse`
+  is implicitly excluded the moment it is created, even if it grows behavior.
+  Acceptable for the demo (configs are typically `@Bean` wiring; responses are
+  records with `@JsonProperty` only); a future class that breaks the
+  convention would need a carve-out or rename.
+- **Threshold floor, not target.** 85 % / 75 % is the minimum the gate accepts,
+  not the goal. Contributors should still aim higher; the gate prevents the
+  most obvious regressions.
+
+**Impact:** `./mvnw verify` is now the authoritative quality gate including
+coverage; CI failures on threshold violations replace human review of the HTML
+report as the first line of defence. `target/site/jacoco/index.html` remains
+the canonical machine-readable report; quick task `006`'s ReportGenerator HTML
+at `target/site/coverage/index.html` is the human-readable view. Docs synced
+under quick task `007-coverage-threshold-gate`:
+`.specs/codebase/{TESTING,STACK,CONCERNS}.md`,
+`.specs/project/{STATE,ROADMAP}.md`, and the F-UPGRADE + F-SAFETY-NET
+out-of-scope rows.
+
 ---
 
 ## Active Blockers
@@ -631,7 +689,7 @@ Ideas captured during work that belong in future features or phases. Prevents sc
 - [ ] Add an `Idempotency-Key` header on `POST /api/orders/generate-invoice` so retries are safe — **Captured during:** brownfield mapping. Belongs in F-RESILIENCE.
 - [ ] Webhook receiver for the delivery system's async confirmation — **Captured during:** integrations doc. Belongs in F-RESILIENCE.
 - [x] Rename `src/main/resources/paylods/` → `payloads/` (C-7) — **Closed:** 2026-05-23. Sweep covered all 24 referencing files (CLAUDE/README/docs/specs/CI workflow); `./mvnw test` green.
-- [ ] JaCoCo coverage gate in CI with per-layer thresholds (≥80 % domain/use-case, ≥60 % adapter) — **Captured during:** TESTING.md. Belongs in F-UPGRADE.
+- [x] JaCoCo coverage gate in CI with per-layer thresholds (≥80 % domain/use-case, ≥60 % adapter) — **Closed:** 2026-05-25 by quick task `007-coverage-threshold-gate` (commit `70ce7ee`). Final shape diverged from the deferred plan: a uniform **bundle** rule (≥ 85 % line, ≥ 75 % branch) with a curated exclude list instead of per-layer thresholds. See AD-036.
 - [ ] Add `@Validated` + Bean Validation annotations on the `Order` payload (e.g., `@Positive`, `@NotNull`) — **Captured during:** brownfield mapping. Belongs in a future validation hardening task; F-DEFECTS-FUNCTIONAL already covers C-2/C-3 domain policy.
 - [ ] Document an ADR comparing CDK vs Terraform if the user wants to revisit AD-005 — **Captured during:** AWS sizing question.
 

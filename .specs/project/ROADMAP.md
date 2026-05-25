@@ -237,7 +237,8 @@ This roadmap reflects the user-confirmed sequencing: **safety net → upgrade �
 - Webhook receiver for delivery system callbacks.
 <!-- C-7 (paylods → payloads rename) closed 2026-05-23; removed from Future Considerations. -->
 
-- Coverage gate in CI (e.g., JaCoCo + minimum thresholds per layer per `TESTING.md`).
+<!-- Coverage gate in CI closed 2026-05-25 by quick task 007-coverage-threshold-gate (commit 70ce7ee): JaCoCo `check` enforces ≥ 85 % line / ≥ 75 % branch at the bundle level. See AD-036 in STATE.md. -->
+- ~~Coverage gate in CI (e.g., JaCoCo + minimum thresholds per layer per `TESTING.md`).~~ — Closed by **quick task `007-coverage-threshold-gate`** (2026-05-25, commit `70ce7ee`).
 - RS256 + JWKS endpoint upgrade for F-AUTH (production path documented in `docs/auth-strategy.md`).
 - Replace `InMemoryUserStore` with a durable user directory (DB / LDAP / IdP).
 - Refresh tokens + `POST /api/auth/refresh`.

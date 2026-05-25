@@ -91,7 +91,7 @@ Actionable warnings about the codebase. Each entry has evidence (file:line), imp
 
 **Previous evidence:** the starter project had two flawed tests and no coverage for bracket edges, freight, fallthrough behavior, slow delivery, or HTTP.
 **Resolution:** The fast suite now has 56 tests; the slow characterization runs via `./mvnw test -Pslow`. Coverage includes tax brackets, freight multipliers, C-1/C-2/C-3/C-6 characterization/regression, HTTP contract, typed 400 responses, and Spring context wiring.
-**Residual risk:** JaCoCo is report-only; no coverage threshold is enforced yet.
+**Residual risk:** none. `./mvnw verify` now enforces ≥ 85 % line and ≥ 75 % branch coverage at the bundle level (quick task `007-coverage-threshold-gate`, commit `70ce7ee`, 2026-05-25). See AD-036 for the threshold + exclude-policy rationale.
 
 ---
 

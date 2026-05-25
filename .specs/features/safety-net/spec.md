@@ -25,7 +25,7 @@ Before refactoring (F-UPGRADE, F-CLEAN) or fixing defects (M2), we need a test s
 | Migrating to `BigDecimal` (C-4)                              | Belongs in M2. Tests must assert against `double` values exactly as the code returns them today.            |
 | Performance tests (latency, throughput)                      | Belongs in M3 / F-DEFECTS-PERFORMANCE.                                                                     |
 | Authentication / authorization tests                         | Out of scope of v1 implementation (only documented in F-AWS).                                              |
-| Coverage **gate** in CI (enforced thresholds)                | Belongs in F-UPGRADE alongside the toolchain refresh. Here we only **measure**.                            |
+| Coverage **gate** in CI (enforced thresholds)                | Out of scope here (measure only). **Eventually shipped 2026-05-25** by quick task `007-coverage-threshold-gate` (commit `70ce7ee`) — bundle ≥ 85 % line / ≥ 75 % branch via `jacoco:check`. See AD-036 in `STATE.md`. |
 | Clean Architecture restructuring (use cases + adapters)      | F-CLEAN. Constructor-injection here is the minimum to enable proper mocking, not a layer split.            |
 | Mutation testing                                             | Nice-to-have; deferred.                                                                                    |
 

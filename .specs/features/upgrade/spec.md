@@ -30,7 +30,7 @@ F-UPGRADE's job is a platform/tooling migration only: update Java/Spring/Maven b
 | Fixing functional defects C-1 through C-4 | Belongs in M2 / F-DEFECTS-FUNCTIONAL. F-UPGRADE must preserve behavior. |
 | Clean Architecture restructuring | Belongs in F-CLEAN, which runs after the upgrade. |
 | Resilience, async processing, observability, or AWS deployment | Later roadmap milestones. |
-| Enforcing JaCoCo minimum coverage thresholds | Deferred; F-UPGRADE keeps JaCoCo report generation but does not fail builds on coverage percentage. |
+| Enforcing JaCoCo minimum coverage thresholds | Deferred during F-UPGRADE (kept report-only). **Closed 2026-05-25** by quick task `007-coverage-threshold-gate` (commit `70ce7ee`): bundle ≥ 85 % line / ≥ 75 % branch, curated excludes. See AD-036 in `STATE.md`. |
 | Broad style rewrites beyond mechanical formatting/import policy | Avoid mixing toolchain upgrade with unrelated refactors. |
 | Renaming `payloads/` to `payloads/` | Cosmetic and deferred as C-7. Existing docs and tests rely on the current path. |
 | Changing JSON payload keys or enum values | Explicit challenge constraint; payload contract remains frozen. |

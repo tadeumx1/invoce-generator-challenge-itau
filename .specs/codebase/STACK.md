@@ -62,7 +62,7 @@
   `@EmbeddedKafka` for the full HTTP → Kafka → consumer flow
 - Newman/Postman: regression collection under `docs/postman/` (rate-limit 429 + happy-path)
 - E2E (outside JVM): none
-- Coverage tool: JaCoCo 0.8.11 (report-only; no threshold enforced)
+- Coverage tool: JaCoCo 0.8.11 — enforced at `verify` (bundle ≥ 85 % line, ≥ 75 % branch; curated excludes for bootstrap, Spring config, DTOs/requests/responses, exceptions, use-case interfaces, `domain/port/**`, `domain/model/**`, integration-event envelopes, Kafka topic/header constants, `RejectionCode`, demo-user data carriers). HTML report at `target/site/jacoco/index.html`.
 
 ## External Services
 
